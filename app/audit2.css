@@ -1,0 +1,27 @@
+.people-grid>.open-profile{appearance:none;width:100%;min-height:220px;text-align:left;color:var(--ink);font:inherit;background:white;border:1px dashed var(--line);border-radius:16px;padding:22px;display:flex;flex-direction:column;align-items:flex-start;gap:16px}
+.people-grid>.open-profile>span:first-child{width:50px;height:50px;border-radius:50%;background:var(--sage);display:grid;place-items:center}
+.people-grid>.open-profile>span:last-child{display:flex;flex-direction:column;gap:7px}
+.checkout article>strong{font-size:18px}
+.package-card button:disabled{background:#dde1da;color:#5e6c66}
+.portal-row{grid-template-columns:110px 1.4fr 1.2fr 110px auto}
+.portal-row .status-pill{justify-self:end}
+.onboard-card>button:disabled{background:#b5bdb8}
+.atlas-composer .send:disabled{background:#acb6b0}
+.service-card{transition:transform .16s ease,box-shadow .16s ease}
+.service-card:hover{transform:translateY(-2px);box-shadow:0 10px 30px #173b3314}
+
+@media(max-width:760px){.people-grid>.open-profile{min-height:190px}
+.portal-row{grid-template-columns:80px 1fr auto}
+.checkout article>strong{font-size:15px}
+}
+
+.atlas-hero input{width:100%;border:0;outline:0;background:transparent;color:var(--ink);padding:2px 0;font-size:13px}
+.atlas-hero .atlas-prompt-examples{font-size:10px;line-height:1.35;color:var(--muted)}
+.atlas-hero .atlas-enter{width:38px;height:38px;flex:0 0 38px;border:0;border-radius:50%;display:grid;place-items:center;background:var(--forest);color:white}
+.atlas-hero .atlas-enter:disabled{background:#aeb8b1;cursor:not-allowed}
+.membership-section{margin-bottom:75px}
+.household-balance p{display:flex;flex-direction:column;gap:7px}.household-balance p small{font-size:9px;letter-spacing:.12em}.household-balance p b{font:25px var(--serif);color:white}.household-balance p span{font-size:11px}
+
+@media(max-width:760px){.atlas-hero .atlas-prompt-examples{display:none}
+.membership-section{margin-bottom:55px}
+}
