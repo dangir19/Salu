@@ -51,11 +51,10 @@ export const topProviders:ProviderProfile[]=[
 ];
 
 export const packages:PackageProduct[]=[
- {id:"runner",name:"Runner Recovery Pack",price:890,expires:"12 months from purchase",items:[{label:"Sports Massages",count:4},{label:"Assisted Stretches",count:2},{label:"PT Assessment",count:1}]},
- {id:"weight",name:"Weight-Loss Support Pack",price:1050,expires:"12 months from purchase",items:[{label:"Dietitian Consultation",count:1},{label:"Nutrition Follow-Ups",count:3},{label:"Body-Composition Appointments",count:2},{label:"Strength Sessions",count:4}]},
- {id:"travel",name:"Travel Recovery Pack",price:345,expires:"6 months from purchase",items:[{label:"Massage",count:1},{label:"Recovery Studio",count:1},{label:"Virtual Wellness Consultation",count:1}]},
- {id:"event",name:"Event Ready Pack",price:525,expires:"6 months from purchase",items:[{label:"Teeth Whitening",count:1},{label:"Facial",count:1},{label:"Massage",count:1},{label:"Private Training",count:1}]},
- {id:"preventive",name:"Preventive Wellness Pack",price:545,expires:"12 months from purchase",items:[{label:"Mobile Blood Draw",count:1},{label:"Dietitian Consultation",count:1},{label:"Body Composition",count:1},{label:"Clinician Consultation",count:1}]}
+ {id:"runner",name:"Runner Recovery Pack",price:800,expires:"12 months from purchase",items:[{label:"Sports Massage",count:4},{label:"Assisted Stretching",count:2}]},
+ {id:"essentials",name:"Salu Essentials Pack",price:900,expires:"12 months from purchase",items:[{label:"Deep Tissue Massage",count:2},{label:"Lymphatic Drainage Massage",count:2},{label:"Acupuncture",count:2}]},
+ {id:"event",name:"Looking Snatched Pack",price:400,expires:"6 months from purchase",items:[{label:"Facial",count:1},{label:"Facial Workout Massage",count:1},{label:"Lymphatic Drainage Massage",count:1}]},
+ {id:"glp",name:"GLP-1 Journey Pack",price:900,expires:"12 months from purchase",items:[{label:"Blood Tests",count:4},{label:"Lymphatic Drainage Massage",count:2},{label:"Facial Workout Massage",count:2}]}
 ];
 
 export const initialBookings:Booking[]=[

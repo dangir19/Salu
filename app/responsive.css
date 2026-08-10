@@ -145,7 +145,7 @@
 @media(max-width:420px){.wordmark{font-size:27px}
 .hero h1{font-size:52px}
 .quiet-links{margin-left:0}
-.quiet-links button{font-size:11px}
+.quiet-links button{font-size:15px;padding-inline:18px}
 .editorial-card{min-width:230px}
 .travel-form>div,.people-grid,.choice-grid{grid-template-columns:1fr}
 .booking-list article{display:grid;grid-template-columns:65px 1fr}

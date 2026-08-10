@@ -1,6 +1,6 @@
 # Salu MVP
 
-Salu is a premium self-pay wellness, recovery and personal-care membership for Miami, positioned as **“Your health best friend.”** The experience feels closer to thoughtful hospitality than a healthcare portal. Atlas, its deterministic demo concierge, provides general wellness education and helps members discover, compare, schedule, reschedule and coordinate independent services.
+Salu is a premium self-pay wellness, recovery and personal-care membership for Miami, positioned as **“Your health concierge.”** The experience feels closer to thoughtful hospitality than a healthcare portal. Atlas, its deterministic demo concierge, provides general wellness education and helps members discover, compare, schedule, reschedule and coordinate independent services.
 
 ## Run locally
 

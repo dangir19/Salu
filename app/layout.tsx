@@ -22,14 +22,14 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://joinsalu.com"),
-  title: "Salu — Your health best friend",
+  title: "Salu — Your health concierge",
   description: "Premium self-pay wellness, recovery and personal care in Miami.",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
   },
   openGraph: {
-    title: "Salu — Your health best friend",
+    title: "Salu — Your health concierge",
     description: "In-home wellness, beautifully handled.",
     url: "https://joinsalu.com",
     siteName: "Salu",
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Salu — Your health best friend",
+    title: "Salu — Your health concierge",
     description: "In-home wellness, beautifully handled.",
     images: ["/og.png"],
   },

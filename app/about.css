@@ -15,7 +15,22 @@
 .about-story p+p{margin-top:24px}
 .about-principles{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
 .about-principles article{min-height:270px;border:1px solid var(--line);border-radius:18px;background:white;padding:28px;display:flex;flex-direction:column}
-.about-principles article>span{font:35px var(--serif);color:#9badA3}
+.principle-mark{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
+.principle-mark>span{font:35px var(--serif);color:#9bada3}
+.principle-icon{position:relative;display:block;width:64px;height:64px;flex:0 0 64px;border-radius:50%;background:#edf3ee;color:#587268}
+.icon-person i{position:absolute;top:10px;left:26px;width:12px;height:12px;border:2px solid currentColor;border-radius:50%}
+.icon-person b{position:absolute;top:25px;left:31px;width:2px;height:23px;background:currentColor}
+.icon-person b::before{content:"";position:absolute;top:7px;left:-12px;width:26px;height:2px;background:currentColor;transform:rotate(-7deg)}
+.icon-person b::after{content:"";position:absolute;top:20px;left:-8px;width:17px;height:14px;border-width:0 2px 2px;border-style:solid;border-color:currentColor;transform:rotate(45deg)}
+.icon-breeze i{position:absolute;height:10px;border-top:2px solid currentColor;border-radius:50%}
+.icon-breeze i:nth-child(1){top:18px;left:13px;width:38px}
+.icon-breeze i:nth-child(2){top:30px;left:20px;width:31px}
+.icon-breeze i:nth-child(3){top:42px;left:12px;width:27px}
+.icon-breeze i::after{content:"";position:absolute;right:-1px;top:-7px;width:8px;height:8px;border:2px solid currentColor;border-left-color:transparent;border-bottom-color:transparent;border-radius:50%}
+.icon-community{box-shadow:inset 0 0 0 1px #6e887e20}
+.icon-community i{--angle:calc(var(--figure)*72deg);position:absolute;top:5px;left:27px;width:10px;height:10px;border:1.5px solid currentColor;border-radius:50%;transform-origin:5px 27px;transform:rotate(var(--angle))}
+.icon-community i::before{content:"";position:absolute;top:10px;left:4px;width:1.5px;height:13px;background:currentColor}
+.icon-community i::after{content:"";position:absolute;top:14px;left:-5px;width:18px;height:8px;border-top:1.5px solid currentColor;border-radius:50%}
 .about-principles small{margin-top:auto;letter-spacing:.14em;color:var(--muted)}
 .about-principles p{font:19px/1.45 var(--serif);margin:12px 0 0}
 @media(max-width:760px){.about-page{padding-top:18px}.about-hero{grid-template-columns:1fr;min-height:auto}.about-hero>div:first-child{min-height:500px;padding:36px 26px}.about-hero h1{font-size:64px}.about-image{height:430px;border-radius:150px 150px 18px 18px}.about-story{margin:75px auto;padding:0 6px}.about-story h2{font-size:48px}.about-principles{grid-template-columns:1fr}.about-principles article{min-height:220px}}
