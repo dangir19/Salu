@@ -18,6 +18,7 @@
 .signin-card button{width:100%;min-height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px;font-weight:750;margin-bottom:12px}
 .signin-google{border:1px solid var(--line);background:#fff;color:var(--ink)}
 .signin-apple{border:0;background:#111;color:#fff}
+.signin-card button.signin-soon{opacity:.55;cursor:not-allowed}
 .signin-dev{flex-direction:column;gap:4px;border:1px dashed #c4a056;background:#fff8ea;color:var(--forest)}
 .signin-dev small{font-size:11px;font-weight:600;letter-spacing:.02em;color:#8a7040}
 .signin-notice{background:var(--foam);border-left:3px solid var(--gold);padding:14px 16px;line-height:1.5;color:var(--ink);margin:8px 0 0}

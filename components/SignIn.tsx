@@ -243,13 +243,14 @@ function OAuthButtons({
       <p className="signin-divider" role="separator">or continue with</p>
       <button
         type="button"
-        className="signin-google"
-        disabled={busy !== null}
+        className={`signin-google${surface.google ? "" : " signin-soon"}`}
+        disabled={busy !== null || !surface.google}
+        aria-disabled={!surface.google}
         onClick={() =>
           start(
             "google",
             surface.google,
-            "Google is coming soon on this deployment. Use email for now — AUTH.md has the optional OAuth keys when you want the shortcut.",
+            "Google is coming soon on this deployment. Use email for now.",
           )
         }
       >
@@ -258,13 +259,14 @@ function OAuthButtons({
       </button>
       <button
         type="button"
-        className="signin-apple"
-        disabled={busy !== null}
+        className={`signin-apple${surface.apple ? "" : " signin-soon"}`}
+        disabled={busy !== null || !surface.apple}
+        aria-disabled={!surface.apple}
         onClick={() =>
           start(
             "apple",
             surface.apple,
-            "Apple is coming soon on this deployment. Use email for now — AUTH.md has the optional Services ID steps when you want the shortcut.",
+            "Apple is coming soon on this deployment. Use email for now.",
           )
         }
       >
