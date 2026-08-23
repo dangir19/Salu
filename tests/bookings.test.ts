@@ -316,7 +316,7 @@ test("does not let a member accept or decline another member's proposed time", a
   assert.ok(provider);
   const created = await createMemberBooking({
     member: owner,
-    serviceId: "facial",
+    serviceId: "lymphatic-massage",
     date: "Thursday · 3:00 PM",
     mode: "At home",
     enforceCredits: true,
