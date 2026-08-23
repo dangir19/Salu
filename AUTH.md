@@ -82,11 +82,11 @@ Apple will not accept `http://localhost`. For a laptop test, put the same Servic
 
 ## Cloudflare / OpenAI hosting
 
-Set the same keys as **Workers environment variables** / OpenAI Sites secrets. Do **not** commit them.
+Production deploys go to Cloudflare Worker `salu` via GitHub Actions ([DEPLOY.md](./DEPLOY.md)). Do **not** commit auth keys.
 
-On Cloudflare: Workers & Pages → your Salu worker → Settings → Variables.
+On Cloudflare: Workers & Pages → **salu** → Settings → Variables and Secrets. Prefer secrets. `AUTH_URL` is `https://salu.<subdomain>.workers.dev` until cutover, then `https://joinsalu.com` ([CUTOVER.md](./CUTOVER.md)).
 
-On OpenAI Sites: project secrets for this repo. `.openai/hosting.json` now binds D1 as `DB` so member rows can persist after deploy.
+OpenAI Sites can still run local / Codex previews. `.openai/hosting.json` binds D1 as `DB` for that path. CI production builds set `SALU_ENABLE_SITES=0` and do not need Sites credentials.
 
 Also set:
 
@@ -95,7 +95,7 @@ AUTH_URL=https://joinsalu.com
 AUTH_SECRET=<production secret, not the stub>
 ```
 
-After the first deploy, confirm:
+Use the `workers.dev` origin for `AUTH_URL` until [CUTOVER.md](./CUTOVER.md). After cutover, confirm:
 
 - `https://joinsalu.com/signin`
 - `https://joinsalu.com/api/auth/csrf` returns JSON
