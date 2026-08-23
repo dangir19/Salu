@@ -11,6 +11,28 @@ export type MembershipPlan={id:ID;name:PlanName;monthlyContribution:number;disco
 export type Wallet={id:ID;householdId:ID;availableCredits:number};
 export type CreditTransaction={id:ID;walletId:ID;kind:"contribution"|"booking"|"refund"|"adjustment"|"topup";credits:number;createdAt:string;bookingId?:ID;label?:string;stripeEventId?:string;stripeObjectId?:string};
 export type Provider={id:ID;name:string;status:"demo"|"pending"|"approved";commissionRate:number};
+export type ProviderApplicationStatus="submitted"|"under_review"|"approved"|"rejected";
+export type ProviderLicenseType="LMT"|"RN"|"Acupuncture Physician"|"Esthetician"|"Stretch practitioner"|"Other";
+export type ProviderDocStatus="missing"|"received";
+export type ProviderApplication={
+  id:ID;
+  fullName:string;
+  email:string;
+  phone?:string;
+  licenseType:ProviderLicenseType;
+  licenseNumber:string;
+  mobileAtHome:boolean;
+  neighborhoods:string[];
+  rateAsk:string;
+  insuranceAttested:boolean;
+  docsLicenseProof:ProviderDocStatus;
+  docsInsurance:ProviderDocStatus;
+  notes?:string;
+  status:ProviderApplicationStatus;
+  reviewNote?:string;
+  createdAt:string;
+  updatedAt:string;
+};
 export type ProviderCredential={id:ID;providerId:ID;label:string;status:"prototype"|"pending_review"|"verified"};
 export type Service={id:ID;providerId:ID;name:string;mode:"home"|"virtual"|"location";standardPrice:number;memberPrice:number};
 export type AppointmentAvailability={id:ID;serviceId:ID;startsAt:string;status:"open"|"held"|"booked"};

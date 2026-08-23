@@ -11,6 +11,7 @@ This file is only the **Connect** follow-up. Do **not** treat wallet contributio
 - Webhooks: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`, `charge.refunded`
 - D1 `wallets`, `credit_transactions`, `stripe_events` plus `members.stripe_customer_id` / `stripe_subscription_id`
 - Member booking create / list / reschedule / cancel on D1 (`BOOKINGS.md`) — Credit spend/refund stays on the wallet ledger
+- Provider applications on D1 (`PROVIDERS.md`) — BD pipeline only; not Connect onboarding
 - Profile billing reads `/api/payments/me` (card last4 when Stripe has one)
 - Demo fallback when `STRIPE_SECRET_KEY` is missing
 

@@ -1,8 +1,9 @@
 import {packages, services} from "../domain/mock-data";
+import {findLiveCatalogService} from "../providers/catalog";
 import {planNameFromId, type PlanId} from "../payments/catalog";
 
 export function findCatalogService(serviceId: string) {
-  return services.find((service) => service.id === serviceId) ?? null;
+  return services.find((service) => service.id === serviceId) ?? findLiveCatalogService(serviceId) ?? null;
 }
 
 export function findCatalogPackage(name: string) {

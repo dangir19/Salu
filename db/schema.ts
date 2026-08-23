@@ -52,6 +52,26 @@ export const stripeEvents = sqliteTable("stripe_events", {
   processedAt: text("processed_at").notNull(),
 });
 
+export const providerApplications = sqliteTable("provider_applications", {
+  id: text("id").primaryKey(),
+  fullName: text("full_name").notNull(),
+  email: text("email").notNull(),
+  phone: text("phone"),
+  licenseType: text("license_type").notNull(),
+  licenseNumber: text("license_number").notNull(),
+  mobileAtHome: integer("mobile_at_home").notNull().default(0),
+  neighborhoods: text("neighborhoods").notNull(),
+  rateAsk: text("rate_ask").notNull(),
+  insuranceAttested: integer("insurance_attested").notNull().default(0),
+  docsLicenseProof: text("docs_license_proof").notNull().default("missing"),
+  docsInsurance: text("docs_insurance").notNull().default("missing"),
+  notes: text("notes"),
+  status: text("status").notNull(),
+  reviewNote: text("review_note"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const bookings = sqliteTable("bookings", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),
