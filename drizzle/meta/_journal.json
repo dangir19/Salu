@@ -43,6 +43,13 @@
       "when": 1755952800000,
       "tag": "0005_connect",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1755960000000,
+      "tag": "0006_credentials",
+      "breakpoints": true
     }
   ]
 }

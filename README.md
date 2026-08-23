@@ -12,9 +12,9 @@ cp .env.example .env
 pnpm dev
 ```
 
-No Google or Apple secrets are required to compile, lint, or test. In development, sign-in offers a labeled **local preview** bypass. Open the local URL printed by the development server.
+No Google or Apple secrets are required to compile, lint, or test. Sign in with **email and password** on `/signin` (or `/provider/signin`). In development, a labeled **local preview** bypass remains as a shortcut. Open the local URL printed by the development server.
 
-To enable real Google / Apple member login, follow **[AUTH.md](./AUTH.md)** (Google Cloud OAuth client, Apple Services ID, `AUTH_*` env on the Cloudflare Worker). To take live cards for Gold / Platinum and Credit top-ups, follow **[STRIPE.md](./STRIPE.md)**. For provider direct deposit, follow **[CONNECT.md](./CONNECT.md)**. Atlas booking tools are in **[ATLAS.md](./ATLAS.md)**. Head of BD runs the Miami supplier pipeline from **[PROVIDERS.md](./PROVIDERS.md)** (`/apply` → D1 → `/admin`).
+To enable optional Google / Apple shortcuts, follow **[AUTH.md](./AUTH.md)** (Google Cloud OAuth client, Apple Services ID, `AUTH_*` env on the Cloudflare Worker). To take live cards for Gold / Platinum and Credit top-ups, follow **[STRIPE.md](./STRIPE.md)**. For provider direct deposit, follow **[CONNECT.md](./CONNECT.md)**. Atlas booking tools are in **[ATLAS.md](./ATLAS.md)**. Head of BD runs the Miami supplier pipeline from **[PROVIDERS.md](./PROVIDERS.md)** (`/apply` → D1 → `/admin`).
 
 Production hosting is a Cloudflare Worker named `salu`, deployed by GitHub Actions on every push to `main`. See **[DEPLOY.md](./DEPLOY.md)** for token permissions and secrets. Do not move **joinsalu.com** off Codex Sites until **[CUTOVER.md](./CUTOVER.md)**.
 
@@ -51,7 +51,7 @@ All provider names, credentials, availability and integration data are clearly i
 app/
   layout.tsx          Metadata and application shell
   [[...slug]]/page.tsx Shareable member routes + session hand-off
-  api/auth            Auth.js Google / Apple / development handlers
+  api/auth            Auth.js email/password, Google / Apple, development handlers
   api/me              Combined member session
   api/payments        Checkout, portal, and wallet snapshot
   api/connect         Express onboarding, payout status
@@ -63,7 +63,7 @@ app/
   chatgpt-auth.ts     OpenAI Sites header identity
 components/
   SaluApp.tsx         Member shell (gated on a real session)
-  SignIn.tsx          Hospitality Google / Apple sign-in
+  SignIn.tsx          Hospitality email/password sign-in; Google / Apple optional
 auth/                 Auth.js config, env stubs, member mapping
 payments/             Stripe env, Checkout, webhook ledger
 connect/              Express accounts, transfers, payout settlement
@@ -85,12 +85,12 @@ ATLAS.md              Concierge tools, safety, and optional language-model path
 tests/                Render/build, auth identity, payments, deploy-config, booking, provider, Atlas, and Connect checks
 ```
 
-Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Those bookings also open assignable provider requests (`/api/provider/requests`). Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin` behind `SALU_ADMIN_EMAILS` and a signed-in staff session. Approved individuals appear in Explore and can sign in with `role=provider`. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)**, **[PROVIDERS.md](./PROVIDERS.md)**, **[PROVIDER.md](./PROVIDER.md)**, and **[ATLAS.md](./ATLAS.md)**.
+Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Those bookings also open assignable provider requests (`/api/provider/requests`). Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin` behind `SALU_ADMIN_EMAILS` and a signed-in staff session. Approved individuals appear in Explore and can sign in with `role=provider`. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require email/password, Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)**, **[PROVIDERS.md](./PROVIDERS.md)**, **[PROVIDER.md](./PROVIDER.md)**, and **[ATLAS.md](./ATLAS.md)**.
 
 ## Production next steps
 
 1. Persist package entitlements and availability holds in D1; add row-level access and audit logging (members, Credits, bookings, provider applications, and request assignments are in place).
-2. Apply `drizzle/0001_payments.sql`, `drizzle/0002_bookings.sql`, `drizzle/0003_provider_applications.sql`, `drizzle/0004_provider_workspace.sql`, and `drizzle/0005_connect.sql` in Cloudflare D1 if you want the tables before first use; see `STRIPE.md`, `BOOKINGS.md`, `PROVIDERS.md`, `PROVIDER.md`, and `CONNECT.md`.
+2. Apply `drizzle/0001_payments.sql`, `drizzle/0002_bookings.sql`, `drizzle/0003_provider_applications.sql`, `drizzle/0004_provider_workspace.sql`, `drizzle/0005_connect.sql`, and `drizzle/0006_credentials.sql` in Cloudflare D1 if you want the tables before first use; see `STRIPE.md`, `BOOKINGS.md`, `PROVIDERS.md`, `PROVIDER.md`, `CONNECT.md`, and `AUTH.md`.
 3. Finish Stripe Connect Dashboard setup (enable Express, add `account.updated` to the webhook) so signed-in providers can complete test-mode onboarding from the provider home. See `CONNECT.md`.
 4. Add live license / insurance verification integrations; never treat Apply attestations or prototype fields as verified.
 5. Optional: set `OPENAI_API_KEY` so Atlas can use a language model on top of the same discover / availability / booking tools. Reschedule and cancel from chat are still follow-ups.

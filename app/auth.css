@@ -6,9 +6,19 @@
 .signin-card{background:white;padding:72px max(40px,7vw);display:flex;flex-direction:column;justify-content:center}
 .signin-card h1{font:50px/.96 var(--serif);letter-spacing:-.04em;margin:14px 0 18px}
 .signin-copy{font:18px/1.5 var(--serif);color:#425f57;margin:0 0 28px;max-width:28rem}
+.signin-form{display:flex;flex-direction:column;gap:12px;margin:0 0 8px;max-width:28rem}
+.signin-form label{display:flex;flex-direction:column;gap:7px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.signin-form input{border:1px solid var(--line);background:var(--ivory);border-radius:12px;min-height:52px;padding:0 16px;font-size:16px;color:var(--ink);letter-spacing:0;text-transform:none;font-weight:500}
+.signin-form input:focus{outline:2px solid #173b33;outline-offset:2px}
+.signin-primary{border:0;background:var(--forest);color:#fff}
+.signin-card .signin-text-link{width:auto;min-height:auto;margin:0;padding:0;border:0;background:none;justify-content:flex-start;font-size:13px;font-weight:700;color:var(--forest)}
+.signin-reset{font-size:13px;line-height:1.55;color:var(--muted);margin:0;letter-spacing:0;text-transform:none;font-weight:500;max-width:28rem}
+.signin-divider{display:flex;align-items:center;gap:12px;margin:18px 0 16px;color:var(--muted);font-size:11px;letter-spacing:.12em;text-transform:uppercase;max-width:28rem}
+.signin-divider::before,.signin-divider::after{content:"";flex:1;height:1px;background:var(--line)}
 .signin-card button{width:100%;min-height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:10px;font-size:15px;font-weight:750;margin-bottom:12px}
 .signin-google{border:1px solid var(--line);background:#fff;color:var(--ink)}
 .signin-apple{border:0;background:#111;color:#fff}
+.signin-card button.signin-soon{opacity:.55;cursor:not-allowed}
 .signin-dev{flex-direction:column;gap:4px;border:1px dashed #c4a056;background:#fff8ea;color:var(--forest)}
 .signin-dev small{font-size:11px;font-weight:600;letter-spacing:.02em;color:#8a7040}
 .signin-notice{background:var(--foam);border-left:3px solid var(--gold);padding:14px 16px;line-height:1.5;color:var(--ink);margin:8px 0 0}

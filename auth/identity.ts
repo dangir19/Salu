@@ -68,7 +68,7 @@ export function sessionFromMember(member: Member, source?: AuthProviderId): Memb
 }
 
 export function normalizeProvider(value?: string | null): AuthProviderId {
-  if (value === "google" || value === "apple" || value === "chatgpt" || value === "development") {
+  if (value === "google" || value === "apple" || value === "chatgpt" || value === "development" || value === "credentials") {
     return value;
   }
   return "development";

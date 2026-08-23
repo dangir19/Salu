@@ -55,4 +55,11 @@ test("maps provider profiles onto Member initials and names", () => {
   assert.equal(member.authProvider, "google");
   assert.ok(member.householdId?.startsWith("hh_"));
   assert.equal(membershipSinceLabel("2026-08-23T12:00:00.000Z"), "August 2026");
+  const native = memberFromIdentity({
+    email: "ava@joinsalu.com",
+    name: "Ava Ruiz",
+    provider: "credentials",
+  });
+  assert.equal(native.authProvider, "credentials");
+  assert.match(native.id, /member_credentials_/);
 });

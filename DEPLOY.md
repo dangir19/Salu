@@ -71,7 +71,7 @@ Google / Apple sign-in is **not** configured by this deploy PR. After the Worker
 
 `wrangler.jsonc` sets `keep_vars: true` so dashboard values survive later CI deploys. Prefer **secrets** over plaintext vars.
 
-Until those keys exist, `/signin` still renders; Continue with Google / Apple stay disabled. Production builds never show the local preview bypass.
+Until those keys exist, `/signin` still renders; Continue with Google / Apple stay labeled as unconfigured. Email/password works without them. Production builds never show the local preview bypass.
 
 ## First deploy (manual `workflow_dispatch`)
 
@@ -131,6 +131,7 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0003_provider_applications.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0004_provider_workspace.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0005_connect.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0006_credentials.sql
 pnpm deploy
 ```
 

@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import {useState} from "react";
+import {useState, type FormEvent} from "react";
 import type {AuthSurface} from "../auth/env";
 
-type ProviderId = "google" | "apple" | "development" | "admin-development";
+type OAuthId = "google" | "apple" | "development" | "provider-development" | "admin-development";
+type BusyId = OAuthId | "credentials";
+type AccountMode = "signin" | "create";
 
 export default function SignIn({
   returnTo = "/",
@@ -13,35 +15,10 @@ export default function SignIn({
   returnTo?: string;
   surface: AuthSurface;
 }) {
-  const [busy, setBusy] = useState<ProviderId | null>(null);
-  const [notice, setNotice] = useState("");
-  const safeReturn = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
+  const [busy, setBusy] = useState<BusyId | null>(null);
+  const [notice, setNotice] = useState(credentialsErrorFromSearch);
+  const safeReturn = safePath(returnTo, "/", "/signin");
   const staffGate = safeReturn === "/admin" || safeReturn.startsWith("/admin/");
-
-  const start = async (provider: ProviderId, configured: boolean, missing: string) => {
-    if (!configured) {
-      setNotice(missing);
-      return;
-    }
-    setBusy(provider);
-    setNotice("");
-    try {
-      const csrfRes = await fetch("/api/auth/csrf");
-      if (!csrfRes.ok) throw new Error("csrf");
-      const {csrfToken} = (await csrfRes.json()) as {csrfToken?: string};
-      if (!csrfToken) throw new Error("csrf");
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = `/api/auth/signin/${provider}`;
-      form.append(hidden("csrfToken", csrfToken));
-      form.append(hidden("callbackUrl", safeReturn === "/signin" ? "/" : safeReturn));
-      document.body.append(form);
-      form.submit();
-    } catch {
-      setBusy(null);
-      setNotice("We couldn’t start sign-in just now. Please try again in a moment.");
-    }
-  };
 
   return (
     <div className="salu-app signin-page">
@@ -54,63 +31,32 @@ export default function SignIn({
       <section className="signin-card" id="signin-card">
         <span className="eyebrow">{staffGate ? "SALU STAFF" : "MEMBERS"}</span>
         <h1>{staffGate ? "Staff sign-in for the review queue." : "Come in. We’ll take it from here."}</h1>
-        <p className="signin-copy">
-          {staffGate
-            ? "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the account on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
-            : "Continue with the account you already use. Atlas, your Credits and Miami bookings stay with your membership."}
-        </p>
-        <button
-          type="button"
-          className="signin-google"
-          disabled={busy !== null}
-          onClick={() =>
-            start(
-              "google",
-              surface.google,
-              "Google sign-in is not configured on this deployment. Add AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET — see AUTH.md.",
-            )
+        <NativeAccountForm
+          kind="member"
+          busy={busy}
+          setBusy={setBusy}
+          setNotice={setNotice}
+          returnTo={safeReturn}
+          signInCopy={
+            staffGate
+              ? "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
+              : "Create an account with email, or sign back in. Atlas, your Credits and Miami bookings stay with your membership."
           }
-        >
-          <GoogleMark />
-          {busy === "google" ? "Opening Google…" : "Continue with Google"}
-        </button>
-        <button
-          type="button"
-          className="signin-apple"
-          disabled={busy !== null}
-          onClick={() =>
-            start(
-              "apple",
-              surface.apple,
-              "Apple sign-in is not configured on this deployment. Add your Services ID and key — see AUTH.md.",
-            )
+          createCopy={
+            staffGate
+              ? "Create the staff email you’ll use on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
+              : "A few details and you’re in. Atlas, Credits and Miami bookings will stay with this membership."
           }
-        >
-          <AppleMark />
-          {busy === "apple" ? "Opening Apple…" : "Continue with Apple"}
-        </button>
-        {surface.development && (
-          <button
-            type="button"
-            className="signin-dev"
-            disabled={busy !== null}
-            onClick={() => start("development", true, "")}
-          >
-            {busy === "development" ? "Opening preview…" : "Continue with a local preview"}
-            <small>Development only · labeled bypass · not a live membership</small>
-          </button>
-        )}
-        {surface.development && staffGate && (
-          <button
-            type="button"
-            className="signin-dev"
-            disabled={busy !== null}
-            onClick={() => start("admin-development", true, "")}
-          >
-            {busy === "admin-development" ? "Opening admin preview…" : "Continue as Salu admin"}
-            <small>Development only · labeled local review · production never exposes the live queue</small>
-          </button>
-        )}
+        />
+        <OAuthButtons
+          kind="member"
+          staffGate={staffGate}
+          surface={surface}
+          busy={busy}
+          start={(provider, configured, missing) =>
+            startOAuth({provider, configured, missing, returnTo: safeReturn, setBusy, setNotice})
+          }
+        />
         {notice && <p className="signin-notice" role="status">{notice}</p>}
         <p className="signin-footnote">
           Independent providers deliver every service. Atlas does not diagnose or prescribe. For emergencies, call 911.
@@ -130,34 +76,9 @@ export function ProviderSignIn({
   returnTo?: string;
   surface: AuthSurface;
 }) {
-  const [busy, setBusy] = useState<ProviderId | "provider-development" | null>(null);
-  const [notice, setNotice] = useState("");
-  const safeReturn = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/provider";
-
-  const start = async (provider: ProviderId | "provider-development", configured: boolean, missing: string) => {
-    if (!configured) {
-      setNotice(missing);
-      return;
-    }
-    setBusy(provider);
-    setNotice("");
-    try {
-      const csrfRes = await fetch("/api/auth/csrf");
-      if (!csrfRes.ok) throw new Error("csrf");
-      const {csrfToken} = (await csrfRes.json()) as {csrfToken?: string};
-      if (!csrfToken) throw new Error("csrf");
-      const form = document.createElement("form");
-      form.method = "POST";
-      form.action = `/api/auth/signin/${provider}`;
-      form.append(hidden("csrfToken", csrfToken));
-      form.append(hidden("callbackUrl", safeReturn === "/provider/signin" ? "/provider" : safeReturn));
-      document.body.append(form);
-      form.submit();
-    } catch {
-      setBusy(null);
-      setNotice("We couldn’t start provider sign-in just now. Please try again in a moment.");
-    }
-  };
+  const [busy, setBusy] = useState<BusyId | null>(null);
+  const [notice, setNotice] = useState(credentialsErrorFromSearch);
+  const safeReturn = safePath(returnTo, "/provider", "/provider/signin");
 
   return (
     <div className="salu-app signin-page">
@@ -170,50 +91,23 @@ export function ProviderSignIn({
       <section className="signin-card" id="signin-card">
         <span className="eyebrow">PROVIDERS</span>
         <h1>Come in. The request queue is waiting.</h1>
-        <p className="signin-copy">
-          Provider sessions are distinct from membership. After approval, the same Google or Apple account opens this workspace with <strong>role=provider</strong>.
-        </p>
-        <button
-          type="button"
-          className="signin-google"
-          disabled={busy !== null}
-          onClick={() =>
-            start(
-              "google",
-              surface.google,
-              "Google sign-in is not configured on this deployment. Add AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET — see AUTH.md.",
-            )
+        <NativeAccountForm
+          kind="provider"
+          busy={busy}
+          setBusy={setBusy}
+          setNotice={setNotice}
+          returnTo={safeReturn}
+          signInCopy="Use the email on your approved Apply. After approval, this same account opens the workspace with role=provider."
+          createCopy="Create the account you’ll use after approval. Role still comes from Apply, SALU_PROVIDER_EMAILS, or the labeled demo."
+        />
+        <OAuthButtons
+          kind="provider"
+          surface={surface}
+          busy={busy}
+          start={(provider, configured, missing) =>
+            startOAuth({provider, configured, missing, returnTo: safeReturn, setBusy, setNotice})
           }
-        >
-          <GoogleMark />
-          {busy === "google" ? "Opening Google…" : "Continue with Google"}
-        </button>
-        <button
-          type="button"
-          className="signin-apple"
-          disabled={busy !== null}
-          onClick={() =>
-            start(
-              "apple",
-              surface.apple,
-              "Apple sign-in is not configured on this deployment. Add your Services ID and key — see AUTH.md.",
-            )
-          }
-        >
-          <AppleMark />
-          {busy === "apple" ? "Opening Apple…" : "Continue with Apple"}
-        </button>
-        {surface.development && (
-          <button
-            type="button"
-            className="signin-dev"
-            disabled={busy !== null}
-            onClick={() => start("provider-development", true, "")}
-          >
-            {busy === "provider-development" ? "Opening Tide & Tone…" : "Continue as Tide & Tone"}
-            <small>Development only · labeled demo provider · not Stripe Connect</small>
-          </button>
-        )}
+        />
         {notice && <p className="signin-notice" role="status">{notice}</p>}
         <p className="signin-footnote">
           Payouts are not live yet. Accepting a request assigns the visit in-app. See PROVIDER.md.
@@ -224,6 +118,290 @@ export function ProviderSignIn({
       </section>
     </div>
   );
+}
+
+function NativeAccountForm({
+  kind,
+  busy,
+  setBusy,
+  setNotice,
+  returnTo,
+  signInCopy,
+  createCopy,
+}: {
+  kind: "member" | "provider";
+  busy: BusyId | null;
+  setBusy: (value: BusyId | null) => void;
+  setNotice: (value: string) => void;
+  returnTo: string;
+  signInCopy: string;
+  createCopy: string;
+}) {
+  const [mode, setMode] = useState<AccountMode>(accountModeFromSearch);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy("credentials");
+    setNotice("");
+    try {
+      if (mode === "create") {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({email, password, displayName}),
+        });
+        const data = (await res.json()) as {error?: string};
+        if (!res.ok) {
+          setNotice(data.error || "We couldn’t create this account just now.");
+          setBusy(null);
+          return;
+        }
+      }
+      await postCredentials({email, password, returnTo});
+    } catch {
+      setBusy(null);
+      setNotice(
+        kind === "provider"
+          ? "We couldn’t start provider sign-in just now. Please try again in a moment."
+          : "We couldn’t start sign-in just now. Please try again in a moment.",
+      );
+    }
+  };
+
+  return (
+    <>
+      <p className="signin-copy">{mode === "create" ? createCopy : signInCopy}</p>
+      <form className="signin-form" onSubmit={(event) => void submit(event)}>
+        {mode === "create" && (
+          <label>
+            How should we greet you?
+            <input
+              type="text"
+              name="displayName"
+              autoComplete="name"
+              value={displayName}
+              onChange={(event) => setDisplayName(event.target.value)}
+              required
+            />
+          </label>
+        )}
+        <label>
+          Email
+          <input
+            type="email"
+            name="email"
+            autoComplete="email"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            required
+          />
+        </label>
+        <label>
+          Password
+          <input
+            type="password"
+            name="password"
+            autoComplete={mode === "create" ? "new-password" : "current-password"}
+            minLength={8}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+        </label>
+        <button type="submit" className="signin-primary" disabled={busy !== null}>
+          {busy === "credentials"
+            ? mode === "create" ? "Creating your account…" : "Signing you in…"
+            : mode === "create" ? "Create account" : "Sign in with email"}
+        </button>
+        <button
+          type="button"
+          className="signin-text-link"
+          disabled={busy !== null}
+          onClick={() => {
+            setMode(mode === "create" ? "signin" : "create");
+            setNotice("");
+          }}
+        >
+          {mode === "create" ? "Already have an account? Sign in" : "New here? Create an account"}
+        </button>
+        {mode === "signin" && (
+          <p className="signin-reset">
+            Forgot your password? Reset isn’t available yet — try Google or Apple if you have them, or create a new account.
+          </p>
+        )}
+      </form>
+    </>
+  );
+}
+
+function OAuthButtons({
+  kind,
+  staffGate = false,
+  surface,
+  busy,
+  start,
+}: {
+  kind: "member" | "provider";
+  staffGate?: boolean;
+  surface: AuthSurface;
+  busy: BusyId | null;
+  start: (provider: OAuthId, configured: boolean, missing: string) => void;
+}) {
+  return (
+    <>
+      <p className="signin-divider" role="separator">or continue with</p>
+      <button
+        type="button"
+        className={`signin-google${surface.google ? "" : " signin-soon"}`}
+        disabled={busy !== null || !surface.google}
+        aria-disabled={!surface.google}
+        onClick={() =>
+          start(
+            "google",
+            surface.google,
+            "Google is coming soon on this deployment. Use email for now.",
+          )
+        }
+      >
+        <GoogleMark />
+        {busy === "google" ? "Opening Google…" : surface.google ? "Continue with Google" : "Continue with Google · coming soon"}
+      </button>
+      <button
+        type="button"
+        className={`signin-apple${surface.apple ? "" : " signin-soon"}`}
+        disabled={busy !== null || !surface.apple}
+        aria-disabled={!surface.apple}
+        onClick={() =>
+          start(
+            "apple",
+            surface.apple,
+            "Apple is coming soon on this deployment. Use email for now.",
+          )
+        }
+      >
+        <AppleMark />
+        {busy === "apple" ? "Opening Apple…" : surface.apple ? "Continue with Apple" : "Continue with Apple · coming soon"}
+      </button>
+      {surface.development && kind === "member" && !staffGate && (
+        <button
+          type="button"
+          className="signin-dev"
+          disabled={busy !== null}
+          onClick={() => start("development", true, "")}
+        >
+          {busy === "development" ? "Opening preview…" : "Continue with a local preview"}
+          <small>Development only · labeled bypass · not a live membership</small>
+        </button>
+      )}
+      {surface.development && kind === "member" && staffGate && (
+        <button
+          type="button"
+          className="signin-dev"
+          disabled={busy !== null}
+          onClick={() => start("admin-development", true, "")}
+        >
+          {busy === "admin-development" ? "Opening admin preview…" : "Continue as Salu admin"}
+          <small>Development only · labeled local review · production never exposes the live queue</small>
+        </button>
+      )}
+      {surface.development && kind === "provider" && (
+        <button
+          type="button"
+          className="signin-dev"
+          disabled={busy !== null}
+          onClick={() => start("provider-development", true, "")}
+        >
+          {busy === "provider-development" ? "Opening Tide & Tone…" : "Continue as Tide & Tone"}
+          <small>Development only · labeled demo provider · not Stripe Connect</small>
+        </button>
+      )}
+    </>
+  );
+}
+
+async function startOAuth({
+  provider,
+  configured,
+  missing,
+  returnTo,
+  setBusy,
+  setNotice,
+}: {
+  provider: OAuthId;
+  configured: boolean;
+  missing: string;
+  returnTo: string;
+  setBusy: (value: BusyId | null) => void;
+  setNotice: (value: string) => void;
+}) {
+  if (!configured) {
+    setNotice(missing);
+    return;
+  }
+  setBusy(provider);
+  setNotice("");
+  try {
+    await postAuthForm(`/api/auth/signin/${provider}`, {callbackUrl: returnTo});
+  } catch {
+    setBusy(null);
+    setNotice(
+      provider === "provider-development"
+        ? "We couldn’t start provider sign-in just now. Please try again in a moment."
+        : "We couldn’t start sign-in just now. Please try again in a moment.",
+    );
+  }
+}
+
+async function postCredentials({
+  email,
+  password,
+  returnTo,
+}: {
+  email: string;
+  password: string;
+  returnTo: string;
+}) {
+  await postAuthForm("/api/auth/signin/credentials", {
+    email,
+    password,
+    callbackUrl: returnTo,
+  });
+}
+
+async function postAuthForm(action: string, fields: Record<string, string>) {
+  const csrfRes = await fetch("/api/auth/csrf");
+  if (!csrfRes.ok) throw new Error("csrf");
+  const {csrfToken} = (await csrfRes.json()) as {csrfToken?: string};
+  if (!csrfToken) throw new Error("csrf");
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = action;
+  form.append(hidden("csrfToken", csrfToken));
+  for (const [name, value] of Object.entries(fields)) {
+    form.append(hidden(name, value));
+  }
+  document.body.append(form);
+  form.submit();
+}
+
+function accountModeFromSearch(): AccountMode {
+  if (typeof window === "undefined") return "signin";
+  return new URLSearchParams(window.location.search).get("mode") === "create" ? "create" : "signin";
+}
+
+function credentialsErrorFromSearch() {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("error") === "CredentialsSignin"
+    ? "We couldn’t sign you in with those details."
+    : "";
+}
+
+function safePath(returnTo: string, fallback: string, blocked: string) {
+  if (!returnTo.startsWith("/") || returnTo.startsWith("//")) return fallback;
+  return returnTo === blocked ? fallback : returnTo;
 }
 
 function hidden(name: string, value: string) {

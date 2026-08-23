@@ -80,6 +80,7 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0003_provider_applications.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0004_provider_workspace.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0005_connect.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0006_credentials.sql
 ```
 
 `0003_provider_applications.sql` adds `provider_applications`. The request queue and calendar tables are in `0004_provider_workspace.sql` ([PROVIDER.md](./PROVIDER.md)). `0005_connect.sql` adds `providers` and `provider_payouts` for Express onboarding and transfers. The Worker also `CREATE TABLE IF NOT EXISTS` on first use.
