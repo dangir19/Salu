@@ -96,9 +96,9 @@ curl -sI https://salu.<subdomain>.workers.dev/explore | head
 curl -sI https://salu.<subdomain>.workers.dev/signin | head
 ```
 
-Expect `200` (or a member redirect to `/signin` for gated surfaces) — not Cloudflare’s generic 404. Unknown paths such as `/not-a-real-page` should render Salu’s “This page isn’t on the map” 404.
+Expect `200` — not Cloudflare’s generic 404. Unknown paths such as `/not-a-real-page` should render Salu’s “This page isn’t on the map” 404. `/admin` still requires a staff session.
 
-In a browser: Home, Atlas, Explore, About, Plans, and sign-in should load. Static assets (`/favicon.svg`, CSS, fonts) should 200.
+In a browser: Home, Atlas, Explore, About, and Plans should load **without** signing in. Sign-in is a popup (or `/signin` as a deep link). Static assets (`/favicon.svg`, CSS, fonts) should 200.
 
 If Google/Apple apps are already created, add the workers.dev origin and `/api/auth/callback/google` (and Apple return URL) as extra authorized URLs for this preview only. After cutover, production callbacks stay on `https://joinsalu.com/api/auth/callback/...` as in AUTH.md.
 

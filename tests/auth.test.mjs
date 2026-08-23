@@ -80,11 +80,20 @@ test("maps sessions onto the Member domain contract and D1 tables", () => {
   assert.match(stripeMd, /joinsalu.com\/api\/stripe\/webhook/);
 });
 
-test("gates the member shell and stops pretending a Visa is live", () => {
+test("lets guests browse the member shell and prompts sign-in in a popup", () => {
   assert.match(app, /isMemberShell\(page\)/);
-  assert.match(app, /<SignIn returnTo=\{returnTo\} surface=\{surface\}\/>/);
+  assert.match(app, /<SignInModal/);
+  assert.match(app, /Browsing Salu/);
+  assert.match(app, /<SignIn returnTo="\/admin" surface=\{surface\}\/>/);
+  assert.doesNotMatch(app, /if\(!session&&isMemberShell\(page\)\) return <SignIn/);
   assert.match(app, /PAYMENT_PLACEHOLDER/);
   assert.doesNotMatch(app, /Visa •••• 4242/);
   assert.doesNotMatch(app, /name\.trim\(\)\.toLowerCase\(\)==="daniel"\?"DG"/);
   assert.match(signIn, /Come in\. We’ll take it from here\./);
+  assert.match(signIn, /Sign in with email/);
+  assert.match(signIn, /Create account/);
+  assert.match(signIn, /\/api\/auth\/register/);
+  assert.match(signIn, /signin-soon/);
+  assert.match(authMd, /Browse first/);
+  assert.match(authMd, /popup/);
 });

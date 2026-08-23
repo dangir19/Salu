@@ -56,6 +56,7 @@
 .menu-button{display:block}
 .profile-dot{display:none}
 .credit-pill span{display:none}
+.browse-pill{display:none}
 .hero{display:block;padding:70px 18px 50px;min-height:auto}
 .hero h1{font-size:59px}
 .hero-copy>p{font-size:17px}

@@ -1,6 +1,6 @@
 # Salu authentication
 
-Salu members and providers create an account with **email and password**. Google and Apple stay as optional shortcuts when their apps exist. Sessions are Auth.js JWTs (`@auth/core`) on vinext / Cloudflare Workers. Member rows persist to D1 when the `DB` binding exists. Password hashes live in `member_credentials` (same D1 / in-memory honesty pattern as members).
+Salu members and providers create an account with **email and password** from a **popup** over the browsable member shell. Google and Apple stay as optional shortcuts when their apps exist. Sessions are Auth.js JWTs (`@auth/core`) on vinext / Cloudflare Workers. Member rows persist to D1 when the `DB` binding exists. Password hashes live in `member_credentials` (same D1 / in-memory honesty pattern as members).
 
 ## Why Auth.js (not Better Auth or Clerk)
 
@@ -133,14 +133,20 @@ Shown only when `NODE_ENV` is not `production`. Labeled **Development only · la
 
 | Path | Role |
 | --- | --- |
-| `/signin` | Hospitality member sign-in / create account |
+| `/signin` | Deep link that opens the member shell with the sign-in popup |
 | `/provider/signin` | Provider sign-in (same Auth.js; demo Tide & Tone in development) |
 | `/admin` | Staff review queue. Requires a signed-in email on `SALU_ADMIN_EMAILS`. |
 | `/api/auth/register` | Native account create (JSON). Then the client signs in through Auth.js. |
 | `/api/auth/*` | Auth.js (signin, callback, signout, csrf, session) including `credentials` |
 | `/api/me` | Combined member + provider + admin session (Auth.js JWT + ChatGPT headers + provider/admin flags) |
 
-Logged-out visitors hitting the member shell (`/`, `/atlas`, `/explore`, …) see `/signin` first. Apply stays public. `/provider` shows the labeled demo plus application lookup until a provider session exists. `/admin` and the application list/status APIs require a signed-in session whose email is on `SALU_ADMIN_EMAILS`. Unauthenticated visitors are sent to `/signin`; signed-in non-staff see **Not authorized** and never receive queue data. Development can use the labeled **Continue as Salu admin** bypass (`admin@localhost`); production builds never register that provider. See [PROVIDERS.md](./PROVIDERS.md) and [PROVIDER.md](./PROVIDER.md).
+## Browse first
+
+The member shell is **not** a sign-in wall. Home, Atlas, Explore, Plans, About, Apply, and the other public member routes render for anonymous visitors. They see a labeled **Browsing Salu** mode — not a fake logged-in member. A Sign in control (header, banner, or `/signin`) opens a hospitality **popup** over the same shell.
+
+Actions that need identity — book, buy Credits, manage profile, start a paid membership, provider workspace, admin — prompt that popup, then continue. `/signin` stays as a deep link; it opens the same modal rather than blocking the homepage. Email and password are the primary fields. Google and Apple stay optional shortcuts and say **coming soon** until their apps exist. Development still offers the labeled local preview.
+
+`/provider` keeps the labeled demo plus application lookup until a provider session exists. `/admin` and the application list/status APIs require a signed-in session whose email is on `SALU_ADMIN_EMAILS`. Unauthenticated visitors opening `/admin` still see staff sign-in; signed-in non-staff see **Not authorized** and never receive queue data. Development can use the labeled **Continue as Salu admin** bypass (`admin@localhost`); production builds never register that provider. See [PROVIDERS.md](./PROVIDERS.md) and [PROVIDER.md](./PROVIDER.md).
 
 ## Member storage
 
