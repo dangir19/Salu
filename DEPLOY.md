@@ -126,6 +126,8 @@ Then apply the checked-in migration and redeploy:
 
 ```bash
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0000_members.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0001_payments.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 pnpm deploy
 ```
 

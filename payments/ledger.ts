@@ -217,3 +217,69 @@ export function membershipLabel(planId: PlanId, kind: "contribution" | "topup" |
   if (kind === "refund") return "Stripe refund · Credits returned";
   return `Salu ${planNameFromId(planId)} monthly contribution`;
 }
+
+export class InsufficientCreditsError extends Error {
+  needed: number;
+  available: number;
+  constructor(needed: number, available: number) {
+    super(`You need ${needed - available} more Credits to confirm.`);
+    this.name = "InsufficientCreditsError";
+    this.needed = needed;
+    this.available = available;
+  }
+}
+
+export async function spendBookingCredits(input: {
+  member: Member;
+  credits: number;
+  bookingId: string;
+  label: string;
+  enforce: boolean;
+}): Promise<{transaction: CreditTransaction | null; availableCredits: number; applied: boolean}> {
+  const snapshot = await getMemberBilling(input.member);
+  if (input.credits <= 0) {
+    return {transaction: null, availableCredits: snapshot.wallet.availableCredits, applied: false};
+  }
+  if (snapshot.transactions.some((row) => row.bookingId === input.bookingId && row.kind === "booking")) {
+    return {transaction: null, availableCredits: snapshot.wallet.availableCredits, applied: false};
+  }
+  if (snapshot.wallet.availableCredits < input.credits) {
+    if (input.enforce) {
+      throw new InsufficientCreditsError(input.credits, snapshot.wallet.availableCredits);
+    }
+    return {transaction: null, availableCredits: snapshot.wallet.availableCredits, applied: false};
+  }
+  const transaction = await applyCreditEntry({
+    member: input.member,
+    credits: -input.credits,
+    kind: "booking",
+    label: input.label,
+    bookingId: input.bookingId,
+  });
+  const after = await getMemberBilling(input.member);
+  return {transaction, availableCredits: after.wallet.availableCredits, applied: Boolean(transaction)};
+}
+
+export async function restoreBookingCredits(input: {
+  member: Member;
+  credits: number;
+  bookingId: string;
+  label: string;
+}): Promise<{transaction: CreditTransaction | null; availableCredits: number; applied: boolean}> {
+  const snapshot = await getMemberBilling(input.member);
+  if (input.credits <= 0) {
+    return {transaction: null, availableCredits: snapshot.wallet.availableCredits, applied: false};
+  }
+  if (snapshot.transactions.some((row) => row.bookingId === input.bookingId && row.kind === "refund")) {
+    return {transaction: null, availableCredits: snapshot.wallet.availableCredits, applied: false};
+  }
+  const transaction = await applyCreditEntry({
+    member: input.member,
+    credits: input.credits,
+    kind: "refund",
+    label: input.label,
+    bookingId: input.bookingId,
+  });
+  const after = await getMemberBilling(input.member);
+  return {transaction, availableCredits: after.wallet.availableCredits, applied: Boolean(transaction)};
+}

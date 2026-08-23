@@ -54,6 +54,7 @@ app/
   api/auth            Auth.js Google / Apple / development handlers
   api/me              Combined member session
   api/payments        Checkout, portal, and wallet snapshot
+  api/bookings        Member create / list / reschedule / cancel
   api/stripe/webhook  Signed Stripe events → membership + Credits
   chatgpt-auth.ts     OpenAI Sites header identity
 components/
@@ -65,21 +66,22 @@ domain/
   mock-data.ts        Miami services, packages, bookings and Atlas fixtures
   types.ts            Member, wallet, and payments-port contracts
   payments.ts         Browser placeholder until /api/payments/me returns a card
-db/                   D1/Drizzle members, wallets, credit ledger
-worker/               Cloudflare entry; auth + payments intercept
+bookings/             Member booking service, catalog prices, handlers
+db/                   D1/Drizzle members, wallets, credit ledger, bookings
+worker/               Cloudflare entry; auth + payments + bookings intercept
 wrangler.jsonc        Production Worker `salu` (CI deploy; no joinsalu.com route)
 .github/workflows/    Verify on PRs; deploy to Workers on `main`
 DEPLOY.md / CUTOVER.md Cloudflare token, secrets, and DNS switch
 .openai/hosting.json  Local / Codex Sites metadata + D1 binding `DB`
-tests/                Render/build, auth identity, payments, and deploy-config checks
+tests/                Render/build, auth identity, payments, deploy-config, and booking API checks
 ```
 
-Bookings and package sessions still survive local review in browser storage. When Stripe keys are present, membership and Credit funding persist on D1 via webhooks. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue.
+Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Without a session, Appointments stay a labeled **demo** in browser storage. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)**.
 
 ## Production next steps
 
-1. Finish D1 migrations, row-level access, and audit logging for bookings and package entitlements (members + Credit ledger are in place).
-2. Apply `drizzle/0001_payments.sql` in Cloudflare D1 if you want the ledger tables before the first webhook; see `STRIPE.md`.
+1. Persist package entitlements and availability holds in D1; add row-level access and audit logging (members, Credits, and bookings are in place).
+2. Apply `drizzle/0001_payments.sql` and `drizzle/0002_bookings.sql` in Cloudflare D1 if you want the tables before the first webhook or reservation; see `STRIPE.md` and `BOOKINGS.md`.
 3. Connect Stripe Connect for provider payouts; recognize commissions separately from customer wallet liabilities. See `NEXT_PAYMENTS.md`.
 4. Implement a provider credential-review workflow; never treat prototype fields as verified.
 5. Connect a real language model through a guarded Atlas orchestration layer with structured discovery, availability, booking, rescheduling and cancellation tools.
