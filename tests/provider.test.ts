@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {resetMemberMemory} from "../auth/members.ts";
+import {createBooking} from "../atlas/tools.ts";
 import {resetBookingMemory, createMemberBooking, cancelMemberBooking, listMemberBookings} from "../bookings/service.ts";
 import {handleProviderFetch} from "../provider/handlers.ts";
 import {
@@ -229,6 +230,27 @@ test("another practice cannot accept a Tide & Tone request", async () => {
     () => acceptRequest({provider: outsider, requestId: opened.id}),
     (error: unknown) => error instanceof ProviderError && error.status === 404,
   );
+});
+
+test("Atlas create_booking opens an assignable provider request", async () => {
+  const member = await seedMember();
+  await fund(member, 200);
+  const provider = await seedProvider();
+  assert.ok(provider);
+
+  const result = await createBooking(
+    {serviceId: "deep-tissue", date: "Tomorrow · 6:15 PM", mode: "At home · Brickell"},
+    {member, planId: "platinum", enforceCredits: true},
+  );
+  assert.equal(result.source, "server");
+  assert.equal(result.booking.assignment, "unassigned");
+  const opened = await requestForBooking(result.booking.id);
+  assert.ok(opened);
+  assert.equal(opened.practiceId, "tide-tone");
+
+  const accepted = await acceptRequest({provider, requestId: opened.id});
+  assert.equal(accepted.status, "accepted");
+  assert.equal((await listMemberBookings(member.id))[0]?.assignment, "accepted");
 });
 
 test("approved Apply email can sign in and accept a live catalog booking", async () => {

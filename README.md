@@ -33,7 +33,7 @@ pnpm test
 - Automatic month-to-month Credit rollover for Gold and Platinum, with no Credit loss
 - Stripe Checkout for Gold / Platinum and Credit top-ups when `STRIPE_*` keys are present; labeled demo wallet without secrets
 - Persistent Ask Atlas action across every member screen
-- Atlas conversation with a guarded tool layer: discover services, check catalog windows, create bookings through `/api/bookings`, and show a confirmation card that opens Appointments
+- Atlas conversation with a guarded tool layer: discover services, check catalog windows, create bookings through `/api/bookings` (those open the provider request queue), and show a confirmation card that opens Appointments
 - Credit deduction, transaction history and package purchase/entitlements
 - Searchable Miami marketplace across at-home, virtual, hotel and provider-location modes
 - Service and provider details, time selection, checkout, rescheduling and cancellation
@@ -83,7 +83,7 @@ ATLAS.md              Concierge tools, safety, and optional language-model path
 tests/                Render/build, auth identity, payments, deploy-config, booking, provider, and Atlas tool checks
 ```
 
-Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Those bookings also open assignable provider requests (`/api/provider/requests`). Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin`. Approved individuals appear in Explore and can sign in with `role=provider`. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)**, **[PROVIDERS.md](./PROVIDERS.md)**, and **[PROVIDER.md](./PROVIDER.md)**.
+Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Those bookings also open assignable provider requests (`/api/provider/requests`). Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin`. Approved individuals appear in Explore and can sign in with `role=provider`. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)**, **[PROVIDERS.md](./PROVIDERS.md)**, **[PROVIDER.md](./PROVIDER.md)**, and **[ATLAS.md](./ATLAS.md)**.
 
 ## Production next steps
 
