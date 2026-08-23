@@ -54,4 +54,6 @@ test("documents what works without Connect", () => {
     assert.match(providerMd, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(bookingsMd, /PROVIDER\.md/);
+  assert.match(providerMd, /ATLAS\.md/);
+  assert.match(providerMd, /create_booking/);
 });
