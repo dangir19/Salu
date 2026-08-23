@@ -26,6 +26,11 @@ test("keeps Atlas primary while preserving marketplace discovery",()=>{
  assert.match(app,/YOUR APPOINTMENTS/);
  assert.doesNotMatch(app,/>Bookings<\/button>/);
  assert.match(app,/Explore Miami/);
+ const home=app.slice(app.indexOf("function Home"),app.indexOf("function CompactService"));
+ assert.match(home,/className="home-apply"/);
+ assert.match(home,/go\("provider-apply"\)/);
+ assert.match(home,/>Apply to Salu</);
+ assert.match(css,/\.home-apply\{[^}]*display:flex/);
  assert.match(app,/Search services/);
  assert.match(css,/\.quiet-links button\{[^}]*min-height:44px[^}]*font-size:15px[^}]*font-weight:750/);
  assert.match(app,/Personal care at your doorstep\./);

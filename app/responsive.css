@@ -63,6 +63,8 @@
 .atlas-hero{padding:10px}
 .atlas-hero small{display:none}
 .quiet-links{margin-left:54px}
+.home-apply{flex-direction:column;align-items:flex-start;padding:28px 18px}
+.home-apply h2{font-size:28px}
 .hero-card{display:flex;min-height:0;border-radius:28px;padding:28px 22px 22px;margin-top:28px}
 .hero-card .script{display:none}
 .nav-backdrop{display:block;position:fixed;inset:0;z-index:25;border:0;background:#173b3326}

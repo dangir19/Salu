@@ -27,6 +27,9 @@ test("wires Apply, catalog, and admin pipeline APIs with a labeled demo catalog"
     "Florida license number",
     "Mobile / at-home",
     "Miami pipeline",
+    "home-apply",
+    'go("provider-apply")',
+    "If you already care for people here",
   ]) {
     assert.match(app, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -47,8 +50,13 @@ test("gates /admin and application list/status behind an allowlisted session", (
   assert.match(routes, /publicPages: Page\[\] = \["signin","provider-apply","provider","provider-signin"\]/);
   assert.doesNotMatch(routes, /publicPages: Page\[\] = \[[^\]]*admin/);
   assert.match(app, /LIVE REVIEW QUEUE/);
+  assert.match(app, /Live D1 pipeline/);
+  assert.match(app, /className="portal-card live-queue"/);
   assert.match(app, /APPROVAL QUEUE · DEMO/);
-  for (const term of ["SALU_ADMIN_EMAILS", "fails closed", "Not authorized", "APPROVAL QUEUE · DEMO"]) {
+  assert.match(app, /Fabricated walkthrough/);
+  assert.match(app, /className="portal-card demo-queue"/);
+  assert.match(app, /DEMO NAME · NOT AN APPLICANT/);
+  for (const term of ["SALU_ADMIN_EMAILS", "fails closed", "Not authorized", "APPROVAL QUEUE · DEMO", "live D1 pipeline", "not applicants"]) {
     assert.match(providersMd, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
   assert.match(authMd, /SALU_ADMIN_EMAILS/);

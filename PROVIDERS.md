@@ -63,7 +63,7 @@ Production fails closed: an empty `SALU_ADMIN_EMAILS` means **nobody** can read 
 
 Development has a labeled **Continue as Salu admin** path (`admin@localhost`), same idea as Tide & Tone. Production builds never register that provider and never treat `admin@localhost` as staff.
 
-The **APPROVAL QUEUE · DEMO** block on `/admin` is fabricated walkthrough names (Sofia Alvarez, Mateo Ruiz, Elena Torres). It is not the D1 pipeline. The **LIVE REVIEW QUEUE** is the real applicant list and stays gated even in local previews.
+The **LIVE REVIEW QUEUE** is the live D1 pipeline — real `/apply` submissions. The **APPROVAL QUEUE · DEMO** block farther down is a fabricated walkthrough (Sofia Alvarez, Mateo Ruiz, Elena Torres). Those names are not applicants. The live queue stays gated even in local previews.
 
 ### Optional ops header
 
