@@ -31,7 +31,7 @@ test("documents D1 binding, Credit enforcement, and what stays demo", () => {
     "drizzle/0002_bookings.sql",
     "customer liabilities",
     "demo",
-    "package remaining",
+    "remaining-session",
     "Stripe Connect",
   ]) {
     assert.match(bookingsMd, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
