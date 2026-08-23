@@ -1,13 +1,17 @@
 import {getToken} from "@auth/core/jwt";
 import {chatgptUserFromHeaders} from "./chatgpt";
 import {authSurface, readAuthEnv, usesSecureCookies} from "./env";
-import {memberFromIdentity, sessionFromMember, type MemberSession} from "./identity";
+import {memberFromIdentity, sessionFromMember, type AdminSession, type MemberSession} from "./identity";
 import {upsertMemberRecord} from "./members";
+import {isAdminEmail} from "../providers/env";
 import type {ProviderSession} from "../provider/session";
+
+export type {AdminSession};
 
 export type MeResponse = {
   member: MemberSession | null;
   provider: ProviderSession | null;
+  admin: AdminSession | null;
   providers: ReturnType<typeof authSurface>;
 };
 
@@ -48,20 +52,28 @@ export async function getMemberSession(request?: Request, headerStore?: Headers)
   return sessionFromMember(await upsertMemberRecord(member), member.authProvider);
 }
 
-export async function getMePayload(request?: Request, headerStore?: Headers): Promise<MeResponse> {
+export async function getMePayload(
+  request?: Request,
+  headerStore?: Headers,
+  runtimeEnv: Record<string, string | undefined> = {},
+): Promise<MeResponse> {
   const member = await getMemberSession(request, headerStore);
   let provider: ProviderSession | null = null;
   if (member) {
     try {
       const {providerSessionFromMember} = await import("../provider/session");
-      provider = await providerSessionFromMember(member);
+      provider = await providerSessionFromMember(member, runtimeEnv);
     } catch {
       provider = null;
     }
   }
+  const admin = member && isAdminEmail(member.member.email, runtimeEnv)
+    ? {role: "admin" as const, email: member.member.email}
+    : null;
   return {
     member,
     provider,
+    admin,
     providers: authSurface(readAuthEnv()),
   };
 }

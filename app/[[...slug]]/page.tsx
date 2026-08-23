@@ -32,5 +32,5 @@ export default async function Page({params}:{params:Promise<Params>}){
  let headerStore:Headers|undefined;
  try{headerStore=await headers()}catch{headerStore=undefined}
  const me=await getMePayload(undefined, headerStore);
- return <SaluApp initialPage={page} initialSession={me.member} authSurface={me.providers} returnTo={pathname}/>;
+ return <SaluApp initialPage={page} initialSession={me.member} initialAdmin={me.admin} authSurface={me.providers} returnTo={pathname}/>;
 }
