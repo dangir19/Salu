@@ -5,6 +5,11 @@ html{scroll-behavior:smooth}
 body{margin:0;background:var(--ivory);color:var(--ink);font-family:Arial,sans-serif}
 button,input,select,textarea{font:inherit}
 button{cursor:pointer;color:inherit}
+:focus-visible{outline:3px solid #c99d5580;outline-offset:3px}
+.skip-link{position:absolute;left:16px;top:-48px;z-index:200;background:var(--forest);color:#fff;padding:10px 14px;border-radius:8px;text-decoration:none;font-size:13px;font-weight:700}
+.skip-link:focus{top:12px}
+.nav-backdrop{display:none}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
 .salu-app{min-height:100vh}
 .wordmark{font:700 31px var(--serif);letter-spacing:-2px;color:var(--forest);background:none;border:0}
 .wordmark span{color:var(--gold)}
@@ -162,6 +167,7 @@ button{cursor:pointer;color:inherit}
 .package-card .package-member-price{margin-top:3px;color:var(--forest);font-size:11px;font-weight:750;line-height:1.45}
 .package-note{margin:8px 0 14px;color:var(--muted);font-size:9px;line-height:1.45}
 .package-card>button,.primary-button{border:0;background:var(--forest);color:white;border-radius:9px;padding:11px 14px;margin-top:18px}
+a.primary-button{display:inline-block;text-align:center;text-decoration:none}
 .package-1{background:#f1e8d8}
 .package-3{background:#e9efe5}
 .package-4{background:#ece8e2}

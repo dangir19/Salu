@@ -1,7 +1,7 @@
 export type Page = "home"|"atlas"|"discover"|"packages"|"about"|"apps"|"wallet"|"bookings"|"household"|"offers"|"pricing"|"onboard"|"provider-apply"|"provider"|"admin";
 export type Service = {id:string;name:string;providerId:string;provider:string;category:string;mode:"At home"|"Virtual"|"Provider location"|"At hotel";area:string;price:number;standardPrice:number;duration:string;rating:number;reviews:number;next:string;description:string;clinical?:boolean;lawful?:string};
 export type ProviderProfile = {id:string;name:string;initials:string;credential:string;focuses:string[];funFact:string;years:number;area:string;rating:number;reviews:number;next:string;serviceId:string};
-export type Booking = {id:string;serviceId:string;serviceName:string;provider:string;date:string;mode:string;credits:number;status:"Upcoming"|"Completed"|"Cancelled"};
+export type Booking = {id:string;serviceId:string;serviceName:string;provider:string;date:string;mode:string;credits:number;status:"Upcoming"|"Completed"|"Cancelled";packageName?:string;packageItem?:string};
 export type PackageProduct = {id:string;name:string;price:number;expires:string;items:{label:string;count:number}[]};
 
 export const services: Service[] = [
@@ -58,7 +58,7 @@ export const packages:PackageProduct[]=[
 ];
 
 export const initialBookings:Booking[]=[
- {id:"b-demo-1",serviceId:"sports-massage",serviceName:"Sports Massage",provider:"Tide & Tone Recovery",date:"Tomorrow · 7:30 PM",mode:"At home · Brickell",credits:165,status:"Upcoming"},
+ {id:"b-demo-1",serviceId:"sports-massage",serviceName:"Sports Massage",provider:"Tide & Tone Recovery",date:"Tomorrow · 7:30 PM",mode:"At home · Miami Beach",credits:0,status:"Upcoming",packageName:"Runner Recovery Pack",packageItem:"Sports Massage"},
  {id:"b-demo-2",serviceId:"pilates",serviceName:"Private Pilates",provider:"Casa Forma",date:"July 28 · 9:00 AM",mode:"Provider location · Coconut Grove",credits:120,status:"Completed"}
 ];
 
