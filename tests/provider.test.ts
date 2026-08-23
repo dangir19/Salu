@@ -97,7 +97,7 @@ test("member bookings open an assignable request the practice can accept", async
 
 test("decline and propose update the member-facing assignment", async () => {
   const member = await seedMember();
-  await fund(member, 200);
+  await fund(member, 400);
   const provider = await seedProvider();
   assert.ok(provider);
 
