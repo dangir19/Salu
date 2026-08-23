@@ -2,10 +2,12 @@ import {getMemberSession} from "../auth/session";
 import {rememberMember} from "../payments/ledger";
 import {applyStripeEnvToProcess, isStripeReady, readStripeEnv, type StripeEnv} from "../payments/env";
 import {
+  acceptProposedBookingTime,
   BookingError,
   cancelMemberBooking,
   completeMemberBooking,
   createMemberBooking,
+  declineProposedBookingTime,
   InsufficientCreditsError,
   listMemberBookings,
   rescheduleMemberBooking,
@@ -63,6 +65,12 @@ export async function handleBookingsFetch(request: Request, runtimeEnv: RuntimeE
   }
   if (url.pathname === "/api/bookings/complete" && request.method === "POST") {
     return handleComplete(request);
+  }
+  if (url.pathname === "/api/bookings/accept-proposal" && request.method === "POST") {
+    return handleAcceptProposal(request);
+  }
+  if (url.pathname === "/api/bookings/decline-proposal" && request.method === "POST") {
+    return handleDeclineProposal(request);
   }
   return new Response("Not found", {status: 404});
 }
@@ -173,6 +181,62 @@ async function handleCancel(request: Request): Promise<Response> {
 
   try {
     const result = await cancelMemberBooking({member, bookingId: body.id ?? ""});
+    const bookings = await listMemberBookings(member.id);
+    return json({
+      source: "server",
+      booking: toUiBooking(result.booking),
+      bookings: bookings.map(toUiBooking),
+      creditsApplied: result.creditsApplied,
+      wallet: {availableCredits: result.availableCredits},
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+async function handleAcceptProposal(request: Request): Promise<Response> {
+  const member = await requireMember(request);
+  if (!member) {
+    return json({source: "demo", error: "Sign in to accept a proposed time."}, 401);
+  }
+
+  let body: {id?: string};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({source: "server", error: "Choose a reservation to accept."}, 400);
+  }
+
+  try {
+    const result = await acceptProposedBookingTime({member, bookingId: body.id ?? ""});
+    const bookings = await listMemberBookings(member.id);
+    return json({
+      source: "server",
+      booking: toUiBooking(result.booking),
+      bookings: bookings.map(toUiBooking),
+      creditsApplied: result.creditsApplied,
+      wallet: {availableCredits: result.availableCredits},
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+async function handleDeclineProposal(request: Request): Promise<Response> {
+  const member = await requireMember(request);
+  if (!member) {
+    return json({source: "demo", error: "Sign in to decline a proposed time."}, 401);
+  }
+
+  let body: {id?: string};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({source: "server", error: "Choose a reservation to decline."}, 400);
+  }
+
+  try {
+    const result = await declineProposedBookingTime({member, bookingId: body.id ?? ""});
     const bookings = await listMemberBookings(member.id);
     return json({
       source: "server",

@@ -59,6 +59,7 @@ export const packages:PackageProduct[]=[
 
 export const initialBookings:Booking[]=[
  {id:"b-demo-1",serviceId:"sports-massage",serviceName:"Sports Massage",provider:"Tide & Tone Recovery",date:"Tomorrow · 7:30 PM",mode:"At home · Miami Beach",credits:0,status:"Upcoming",packageName:"Runner Recovery Pack",packageItem:"Sports Massage"},
+ {id:"b-demo-3",serviceId:"lymphatic-massage",serviceName:"Lymphatic Drainage Massage",provider:"Tide & Tone Recovery",date:"Friday · 3:30 PM",mode:"At home · Miami-Dade",credits:120,status:"Upcoming",assignment:"proposed",proposedDate:"Friday · 8:00 PM"},
  {id:"b-demo-2",serviceId:"pilates",serviceName:"Private Pilates",provider:"Casa Forma",date:"July 28 · 9:00 AM",mode:"Provider location · Coconut Grove",credits:120,status:"Completed"}
 ];
 

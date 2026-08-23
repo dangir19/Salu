@@ -48,6 +48,8 @@ test("documents what works without Connect", () => {
     "drizzle/0004_provider_workspace.sql",
     "appointment_requests",
     "in-app queue",
+    "accept-proposal",
+    "decline-proposal",
     "Stripe Connect",
     "demo",
   ]) {

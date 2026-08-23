@@ -14,8 +14,12 @@ test("wires member booking APIs and keeps a labeled demo fallback", () => {
     "/api/bookings/cancel",
     "/api/bookings/complete",
     "/api/bookings/reschedule",
+    "/api/bookings/accept-proposal",
+    "/api/bookings/decline-proposal",
     "confirmServerBooking",
     "cancelServerBooking",
+    "This time works",
+    "Not this time",
     "Demo appointments",
     "setCredits(v=>v+booking.credits)",
   ]) {
@@ -33,6 +37,8 @@ test("documents D1 binding, Credit enforcement, and what stays demo", () => {
     "customer liabilities",
     "demo",
     "remaining-session",
+    "accept-proposal",
+    "decline-proposal",
     "Stripe Connect",
   ]) {
     assert.match(bookingsMd, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
