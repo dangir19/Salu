@@ -138,6 +138,7 @@
 .portal-row{grid-template-columns:80px 1fr auto}
 .portal-row span:nth-child(3){display:none}
 .economics>div{grid-template-columns:1fr 1fr}
+.payouts-card .payout-status-row{flex-direction:column}
 .admin-columns{grid-template-columns:1fr}
 .member-footer{grid-template-columns:1fr 1fr;padding:45px 18px}
 .member-footer>div:first-child{grid-column:1/-1}

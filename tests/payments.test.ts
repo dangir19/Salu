@@ -21,6 +21,7 @@ const env: StripeEnv = {
   STRIPE_WEBHOOK_SECRET: "whsec_test_dummy",
   STRIPE_GOLD_PRICE_ID: "price_gold",
   STRIPE_PLATINUM_PRICE_ID: "price_platinum",
+  STRIPE_CONNECT_CLIENT_ID: "",
 };
 
 async function seedMember() {
@@ -43,6 +44,7 @@ test("hides Stripe until secret keys are present", () => {
     STRIPE_WEBHOOK_SECRET: "",
     STRIPE_GOLD_PRICE_ID: "",
     STRIPE_PLATINUM_PRICE_ID: "",
+    STRIPE_CONNECT_CLIENT_ID: "",
   });
   const surface = paymentsSurface(empty);
   assert.equal(surface.stripe, false);

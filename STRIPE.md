@@ -2,7 +2,7 @@
 
 Salu membership (Gold / Platinum) and Credit top-ups charge through **Stripe Checkout**. Webhooks write the plan and Credit ledger on the server (D1). The browser is never the source of truth for paid entitlements.
 
-Stripe Connect / provider payouts are **not** in this release. See [NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md).
+Stripe Connect / provider payouts are in **[CONNECT.md](./CONNECT.md)** (Express onboarding + transfers on completed bookings).
 
 ## When Daniel must sign into Stripe
 
@@ -24,7 +24,7 @@ Use **Test mode** until you are ready for live cards. Toggle Test / Live in the 
 | Credits | **Add 100 Credits** opens Stripe Checkout (`$100` → 100 Credits) | **Add 100 demo Credits** |
 | Profile billing | Brand + last4 from Stripe, plus **Manage billing** (Customer Portal) | “No payment method on file” / “Stripe Billing is not connected yet” |
 
-Wallet contributions are **customer liabilities**. They are not Salu revenue. Salu revenue remains marketplace commission (`PlatformCommission`). Provider payouts stay estimated until Connect.
+Wallet contributions are **customer liabilities**. They are not Salu revenue. Salu revenue remains marketplace commission (`PlatformCommission`). Provider payouts use Connect transfers; see [CONNECT.md](./CONNECT.md).
 
 ## Environment keys
 
@@ -71,7 +71,7 @@ Dashboard → **Developers → Webhooks → Add endpoint**.
 | --- | --- |
 | Endpoint URL | `https://joinsalu.com/api/stripe/webhook` |
 | API version | Account default is fine |
-| Events | `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`, `charge.refunded` |
+| Events | `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`, `charge.refunded`, plus Connect: `account.updated`, `transfer.created`, `transfer.updated`, `transfer.reversed` |
 
 Copy **Signing secret** → `STRIPE_WEBHOOK_SECRET`.
 
@@ -127,6 +127,6 @@ Booking spend and refunds use this same ledger. Appointment rows live in `drizzl
 - Credits funded by Stripe = **wallet liability**
 - Completed marketplace volume = **GMV**
 - Salu take-rate = **commission** (`PlatformCommission`)
-- Provider money movement = **Connect** (next)
+- Provider money movement = **Connect transfer** ([CONNECT.md](./CONNECT.md))
 
 Do not treat Gold/Platinum monthly charges as revenue until a booking earns commission.

@@ -58,9 +58,39 @@ export type StripeCharge = StripeObject & {
   metadata?: Record<string, string>;
 };
 
+export type StripeAccount = StripeObject & {
+  type?: string;
+  email?: string | null;
+  charges_enabled?: boolean;
+  payouts_enabled?: boolean;
+  details_submitted?: boolean;
+  metadata?: Record<string, string>;
+  requirements?: {currently_due?: string[]; disabled_reason?: string | null};
+};
+
+export type StripeAccountLink = {
+  object: string;
+  url: string;
+  expires_at?: number;
+};
+
+export type StripeLoginLink = {
+  object: string;
+  url: string;
+};
+
+export type StripeTransfer = StripeObject & {
+  amount?: number;
+  currency?: string;
+  destination?: string;
+  reversed?: boolean;
+  metadata?: Record<string, string>;
+};
+
 export type StripeEvent = {
   id: string;
   type: string;
+  account?: string;
   data: {object: StripeObject};
 };
 
@@ -90,17 +120,25 @@ function encodeStripeParams(value: unknown, prefix = ""): Array<[string, string]
   return [[prefix, String(value)]];
 }
 
+export type StripeRequestOptions = {
+  idempotencyKey?: string;
+  stripeAccount?: string;
+};
+
 export async function stripeRequest<T>(
   secret: string,
   method: "GET" | "POST",
   path: string,
   params?: Record<string, unknown>,
+  options?: StripeRequestOptions,
 ): Promise<T> {
   const url = new URL(`${STRIPE_API}${path}`);
   const headers: Record<string, string> = {
     Authorization: `Bearer ${secret}`,
     "Stripe-Version": STRIPE_VERSION,
   };
+  if (options?.idempotencyKey) headers["Idempotency-Key"] = options.idempotencyKey;
+  if (options?.stripeAccount) headers["Stripe-Account"] = options.stripeAccount;
 
   let body: string | undefined;
   if (method === "GET" && params) {
@@ -226,4 +264,76 @@ export function subscriptionItemId(subscription: StripeSubscription | null | und
 
 export function invoiceSubscriptionId(invoice: StripeInvoice): string {
   return idFromExpandable(invoice.subscription) || idFromExpandable(invoice.parent?.subscription_details?.subscription);
+}
+
+export async function createConnectAccount(
+  secret: string,
+  input: {email: string; name: string; providerId: string; memberId?: string},
+): Promise<StripeAccount> {
+  return stripeRequest<StripeAccount>(secret, "POST", "/accounts", {
+    type: "express",
+    country: "US",
+    email: input.email,
+    business_profile: {
+      name: input.name,
+      product_description: "Independent Salu marketplace services",
+      url: "https://joinsalu.com",
+    },
+    capabilities: {transfers: {requested: true}},
+    metadata: {
+      providerId: input.providerId,
+      memberId: input.memberId ?? "",
+      platform: "salu",
+    },
+  });
+}
+
+export async function retrieveConnectAccount(secret: string, accountId: string): Promise<StripeAccount> {
+  return stripeRequest<StripeAccount>(secret, "GET", `/accounts/${accountId}`);
+}
+
+export async function createAccountLink(
+  secret: string,
+  input: {account: string; refreshUrl: string; returnUrl: string},
+): Promise<StripeAccountLink> {
+  return stripeRequest<StripeAccountLink>(secret, "POST", "/account_links", {
+    account: input.account,
+    refresh_url: input.refreshUrl,
+    return_url: input.returnUrl,
+    type: "account_onboarding",
+  });
+}
+
+export async function createAccountLoginLink(secret: string, accountId: string): Promise<StripeLoginLink> {
+  return stripeRequest<StripeLoginLink>(secret, "POST", `/accounts/${accountId}/login_links`);
+}
+
+export async function createTransfer(
+  secret: string,
+  input: {
+    amountCents: number;
+    destination: string;
+    bookingId: string;
+    providerId: string;
+    commissionAmount: number;
+  },
+): Promise<StripeTransfer> {
+  return stripeRequest<StripeTransfer>(
+    secret,
+    "POST",
+    "/transfers",
+    {
+      amount: input.amountCents,
+      currency: "usd",
+      destination: input.destination,
+      transfer_group: input.bookingId,
+      metadata: {
+        bookingId: input.bookingId,
+        providerId: input.providerId,
+        commissionAmount: String(input.commissionAmount),
+        kind: "provider_payout",
+      },
+    },
+    {idempotencyKey: `salu_payout_${input.bookingId}`},
+  );
 }

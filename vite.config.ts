@@ -39,6 +39,7 @@ function localAuthVars() {
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "",
     STRIPE_GOLD_PRICE_ID: process.env.STRIPE_GOLD_PRICE_ID ?? "",
     STRIPE_PLATINUM_PRICE_ID: process.env.STRIPE_PLATINUM_PRICE_ID ?? "",
+    STRIPE_CONNECT_CLIENT_ID: process.env.STRIPE_CONNECT_CLIENT_ID ?? "",
     OPENAI_API_KEY: process.env.OPENAI_API_KEY ?? "",
     OPENAI_MODEL: process.env.OPENAI_MODEL ?? "",
   };

@@ -7,6 +7,7 @@ export type StripeEnv = {
   STRIPE_WEBHOOK_SECRET: string;
   STRIPE_GOLD_PRICE_ID: string;
   STRIPE_PLATINUM_PRICE_ID: string;
+  STRIPE_CONNECT_CLIENT_ID: string;
 };
 
 type EnvRecord = Record<string, string | undefined>;
@@ -31,6 +32,7 @@ export function readStripeEnv(overrides: EnvRecord = {}): StripeEnv {
     STRIPE_WEBHOOK_SECRET: readValue(sources, "STRIPE_WEBHOOK_SECRET"),
     STRIPE_GOLD_PRICE_ID: readValue(sources, "STRIPE_GOLD_PRICE_ID"),
     STRIPE_PLATINUM_PRICE_ID: readValue(sources, "STRIPE_PLATINUM_PRICE_ID"),
+    STRIPE_CONNECT_CLIENT_ID: readValue(sources, "STRIPE_CONNECT_CLIENT_ID"),
   };
 }
 
@@ -41,6 +43,7 @@ export function paymentsSurface(env: StripeEnv = readStripeEnv()): PaymentsSurfa
     platinumPrice: Boolean(env.STRIPE_PLATINUM_PRICE_ID),
     webhook: Boolean(env.STRIPE_WEBHOOK_SECRET),
     publishable: Boolean(env.STRIPE_PUBLISHABLE_KEY),
+    connect: Boolean(env.STRIPE_SECRET_KEY),
   };
 }
 
@@ -65,4 +68,5 @@ export function applyStripeEnvToProcess(env: StripeEnv): void {
   process.env.STRIPE_WEBHOOK_SECRET = env.STRIPE_WEBHOOK_SECRET;
   process.env.STRIPE_GOLD_PRICE_ID = env.STRIPE_GOLD_PRICE_ID;
   process.env.STRIPE_PLATINUM_PRICE_ID = env.STRIPE_PLATINUM_PRICE_ID;
+  process.env.STRIPE_CONNECT_CLIENT_ID = env.STRIPE_CONNECT_CLIENT_ID;
 }

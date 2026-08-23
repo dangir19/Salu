@@ -66,6 +66,17 @@
 .economics>div{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .economics>div span{background:var(--ivory);border-radius:10px;padding:15px;display:flex;flex-direction:column;gap:7px}
 .economics>p{color:var(--muted);font-size:10px}
+.payouts-card .payout-status-row{display:flex;gap:16px;align-items:flex-start;margin:8px 0 16px}
+.payouts-card .payout-status-row p{margin:0;color:var(--muted);font-size:13px;line-height:1.5}
+.status-pill.payout-not_connected{background:#f0e3cf}
+.status-pill.payout-pending{background:#e8dfc4}
+.status-pill.payout-payouts_enabled{background:var(--sage)}
+.payout-practice{display:flex;flex-direction:column;gap:7px;font-size:11px;font-weight:700;margin:12px 0}
+.payout-practice select{border:1px solid var(--line);background:var(--ivory);border-radius:9px;padding:11px;color:var(--ink);max-width:360px}
+.payout-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.payout-actions .primary-button{margin-top:0}
+.ghost-button{border:1px solid var(--line);background:white;border-radius:9px;padding:11px 14px}
+.payout-note{color:var(--muted);font-size:11px;margin-top:14px}
 .revenue-note{background:#f0e3cf;border-left:3px solid var(--gold);padding:16px;display:flex;gap:18px;font-size:12px}
 .admin-metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;margin-top:18px}
 .admin-columns{display:grid;grid-template-columns:1fr 1fr;gap:18px}

@@ -126,6 +126,35 @@ export const providerBlocks = sqliteTable("provider_blocks", {
   createdAt: text("created_at").notNull(),
 });
 
+export const providers = sqliteTable("providers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email"),
+  memberId: text("member_id"),
+  status: text("status").notNull().default("approved"),
+  commissionRate: integer("commission_rate").notNull().default(20),
+  stripeConnectAccountId: text("stripe_connect_account_id"),
+  connectStatus: text("connect_status").notNull().default("not_connected"),
+  chargesEnabled: integer("charges_enabled").notNull().default(0),
+  payoutsEnabled: integer("payouts_enabled").notNull().default(0),
+  detailsSubmitted: integer("details_submitted").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const providerPayouts = sqliteTable("provider_payouts", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  providerId: text("provider_id").notNull(),
+  grossAmount: integer("gross_amount").notNull(),
+  commissionAmount: integer("commission_amount").notNull(),
+  netPayout: integer("net_payout").notNull(),
+  status: text("status").notNull(),
+  stripeTransferId: text("stripe_transfer_id"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const bookings = sqliteTable("bookings", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),

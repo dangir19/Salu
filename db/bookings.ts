@@ -70,6 +70,17 @@ export async function listBookingsForMember(memberId: string): Promise<Booking[]
   });
 }
 
+export async function listBookingsForProvider(providerName: string): Promise<Booking[] | null> {
+  return withBookingsDb(async (db) => {
+    const rows = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.provider, providerName))
+      .orderBy(desc(bookings.createdAt));
+    return rows.map(bookingFromRow);
+  });
+}
+
 export async function getBookingById(id: string): Promise<Booking | null> {
   return withBookingsDb(async (db) => {
     const rows = await db.select().from(bookings).where(eq(bookings.id, id)).limit(1);

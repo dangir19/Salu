@@ -14,11 +14,13 @@ import {
   retrieveCustomer,
   retrieveSubscription,
   subscriptionPriceId,
+  type StripeAccount,
   type StripeCharge,
   type StripeCheckoutSession,
   type StripeEvent,
   type StripeInvoice,
   type StripeSubscription,
+  type StripeTransfer,
 } from "./stripe";
 
 export type WebhookResult = {
@@ -96,6 +98,13 @@ export async function applyStripeEvent(env: StripeEnv, event: StripeEvent): Prom
       return handleSubscriptionChange(env, event, event.data.object as StripeSubscription);
     case "charge.refunded":
       return handleChargeRefunded(env, event, event.data.object as StripeCharge);
+    case "account.updated":
+      return handleAccountUpdated(event, event.data.object as StripeAccount);
+    case "transfer.created":
+    case "transfer.updated":
+      return handleTransferEvent(event, event.data.object as StripeTransfer, "paid");
+    case "transfer.reversed":
+      return handleTransferEvent(event, event.data.object as StripeTransfer, "failed");
     default:
       return {eventId: event.id, type: event.type, applied: false, detail: "ignored"};
   }
@@ -250,4 +259,34 @@ async function handleChargeRefunded(env: StripeEnv, event: StripeEvent, charge: 
     stripeObjectId: `${charge.id}:refund`,
   });
   return {eventId: event.id, type: event.type, applied: true, detail: `refund ${credits}`};
+}
+
+async function handleAccountUpdated(event: StripeEvent, account: StripeAccount): Promise<WebhookResult> {
+  const connect = await import("../connect/service");
+  const provider = await connect.syncProviderFromAccount({
+    account,
+    providerId: account.metadata?.providerId,
+  });
+  if (!provider) {
+    return {eventId: event.id, type: event.type, applied: false, detail: "provider not found"};
+  }
+  return {
+    eventId: event.id,
+    type: event.type,
+    applied: true,
+    detail: `${provider.id} ${provider.connectStatus}`,
+  };
+}
+
+async function handleTransferEvent(
+  event: StripeEvent,
+  transfer: StripeTransfer,
+  status: "paid" | "failed",
+): Promise<WebhookResult> {
+  const connect = await import("../connect/service");
+  const payout = await connect.applyTransferToPayout({transfer, status});
+  if (!payout) {
+    return {eventId: event.id, type: event.type, applied: false, detail: "payout not found"};
+  }
+  return {eventId: event.id, type: event.type, applied: true, detail: `${payout.bookingId} ${payout.status}`};
 }
