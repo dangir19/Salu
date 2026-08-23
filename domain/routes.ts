@@ -16,6 +16,7 @@ export const pagePath: Record<Page,string>={
  "provider-apply":"/apply",
  provider:"/provider",
  admin:"/admin",
+ signin:"/signin",
 };
 
 const pathAliases: Record<string,Page>={
@@ -42,6 +43,7 @@ const pathAliases: Record<string,Page>={
  "/apply":"provider-apply",
  "/provider":"provider",
  "/admin":"admin",
+ "/signin":"signin",
 };
 
 export const pageTitles: Record<Page,string>={
@@ -60,6 +62,7 @@ export const pageTitles: Record<Page,string>={
  "provider-apply":"Apply to Salu",
  provider:"Provider demo — Salu",
  admin:"Admin demo — Salu",
+ signin:"Sign in — Salu",
 };
 
 export const pageDescriptions: Record<Page,string>={
@@ -71,14 +74,21 @@ export const pageDescriptions: Record<Page,string>={
  apps:"Prototype connections that show how Atlas could coordinate around your week.",
  wallet:"Salu Credits are self-pay marketplace funds. Gold and Platinum Credits roll automatically.",
  bookings:"Review, move or cancel the appointments Atlas keeps close at hand.",
- household:"Your Salu snapshot, home base and demo account preferences.",
+ household:"Your Salu snapshot, home base and account preferences.",
  offers:"Quietly useful member moments selected around your membership.",
  pricing:"Member is free. Gold is $200 monthly for 10% off. Platinum is $500 monthly for 20% off.",
  onboard:"Join Salu and start a demo membership with Credits ready to use.",
  "provider-apply":"Apply to bring exceptional independent care to Salu members.",
  provider:"Fabricated provider workspace for reviewing Salu marketplace economics.",
  admin:"Fabricated operating view of member funds, volume and Salu revenue.",
+ signin:"Continue with Google or Apple to open your Salu membership.",
 };
+
+export const publicPages: Page[] = ["signin","provider-apply","provider","admin"];
+
+export function isMemberShell(page: Page): boolean {
+ return !publicPages.includes(page);
+}
 
 export function pageFromPath(pathname:string):Page|"missing"{
  const clean=pathname.replace(/\/+$/,"")||"/";
