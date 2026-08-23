@@ -113,7 +113,7 @@ Shown only when `NODE_ENV` is not `production`. Labeled **Development only · la
 | `/api/auth/*` | Auth.js (signin, callback, signout, csrf, session) |
 | `/api/me` | Combined member session (Auth.js JWT + ChatGPT headers + provider flags) |
 
-Logged-out visitors hitting the member shell (`/`, `/atlas`, `/explore`, …) see `/signin` first. Provider/admin demos stay public.
+Logged-out visitors hitting the member shell (`/`, `/atlas`, `/explore`, …) see `/signin` first. Apply, provider workspace, and admin stay public. Admin status writes are open unless `SALU_OPS_SECRET` is set (see [PROVIDERS.md](./PROVIDERS.md)).
 
 ## Member storage
 

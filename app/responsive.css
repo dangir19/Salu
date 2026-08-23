@@ -126,6 +126,8 @@
 .onboard-card{padding:45px 22px;min-height:90vh}
 .onboard-card h1{font-size:42px}
 .application-form{grid-template-columns:1fr;padding:20px}
+.pipeline-row{grid-template-columns:1fr}
+.supplier-card{grid-template-columns:1fr}
 .portal-shell{grid-template-columns:1fr}
 .portal-shell>aside{position:static;height:auto;display:flex;flex-direction:row;align-items:center;padding:15px}
 .portal-shell>aside>small,.portal-shell>aside>button:not(.wordmark):not(.back-member){display:none}

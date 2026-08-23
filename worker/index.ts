@@ -13,8 +13,9 @@ interface Env {
   AUTH_APPLE_SECRET?: string;
   AUTH_APPLE_TEAM_ID?: string;
   AUTH_APPLE_KEY_ID?: string;
-  AUTH_APPLE_PRIVATE_KEY?: string;
-  STRIPE_SECRET_KEY?: string;
+    AUTH_APPLE_PRIVATE_KEY?: string;
+    SALU_OPS_SECRET?: string;
+    STRIPE_SECRET_KEY?: string;
   STRIPE_PUBLISHABLE_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_GOLD_PRICE_ID?: string;
@@ -56,6 +57,11 @@ const worker = {
     if (url.pathname.startsWith("/api/bookings")) {
       const {handleBookingsFetch} = await import("../bookings/handlers");
       return handleBookingsFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
+    if (url.pathname.startsWith("/api/providers")) {
+      const {handleProvidersFetch} = await import("../providers/handlers");
+      return handleProvidersFetch(request, env as unknown as Record<string, string | undefined>);
     }
 
     if (url.pathname === "/_vinext/image") {

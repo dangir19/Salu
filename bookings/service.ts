@@ -111,7 +111,8 @@ export async function createMemberBooking(input: {
   availabilityId?: string;
   enforceCredits: boolean;
 }): Promise<{booking: Booking; creditsApplied: boolean; availableCredits: number}> {
-  const service = findCatalogService(input.serviceId);
+  const service = findCatalogService(input.serviceId)
+    ?? await import("../providers/service").then((mod) => mod.findApprovedCatalogService(input.serviceId));
   if (!service) throw new BookingError("That service is not on the Salu menu.");
   const date = input.date.trim();
   const mode = input.mode.trim();
