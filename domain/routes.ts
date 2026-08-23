@@ -15,6 +15,7 @@ export const pagePath: Record<Page,string>={
  onboard:"/join",
  "provider-apply":"/apply",
  provider:"/provider",
+ "provider-signin":"/provider/signin",
  admin:"/admin",
  signin:"/signin",
 };
@@ -42,6 +43,7 @@ const pathAliases: Record<string,Page>={
  "/onboard":"onboard",
  "/apply":"provider-apply",
  "/provider":"provider",
+ "/provider/signin":"provider-signin",
  "/admin":"admin",
  "/signin":"signin",
 };
@@ -61,6 +63,7 @@ export const pageTitles: Record<Page,string>={
  onboard:"Join Salu",
  "provider-apply":"Apply to Salu",
  provider:"Provider workspace — Salu",
+ "provider-signin":"Provider sign in — Salu",
  admin:"Miami pipeline — Salu",
  signin:"Sign in — Salu",
 };
@@ -79,12 +82,13 @@ export const pageDescriptions: Record<Page,string>={
  pricing:"Member is free. Gold is $200 monthly for 10% off. Platinum is $500 monthly for 20% off.",
  onboard:"Join Salu and start a demo membership with Credits ready to use.",
  "provider-apply":"Apply as a named independent provider — LMT or other solo licensed person — in Miami.",
- provider:"Lightweight workspace for your individual Salu application, plus a labeled demo calendar.",
+ provider:"Accept appointment requests, keep a provider calendar, and look up your Apply status.",
+ "provider-signin":"Continue as a Salu provider to fill member appointment requests.",
  admin:"Miami review queue for named providers, plus a labeled demo operating view of funds and volume.",
  signin:"Continue with Google or Apple to open your Salu membership.",
 };
 
-export const publicPages: Page[] = ["signin","provider-apply","provider","admin"];
+export const publicPages: Page[] = ["signin","provider-apply","provider","provider-signin","admin"];
 
 export function isMemberShell(page: Page): boolean {
  return !publicPages.includes(page);

@@ -11,6 +11,8 @@ declare module "cloudflare:workers" {
     AUTH_APPLE_KEY_ID?: string;
     AUTH_APPLE_PRIVATE_KEY?: string;
     SALU_ALLOW_DEV_BYPASS?: string;
+    SALU_OPS_SECRET?: string;
+    SALU_PROVIDER_EMAILS?: string;
     STRIPE_SECRET_KEY?: string;
     STRIPE_PUBLISHABLE_KEY?: string;
     STRIPE_WEBHOOK_SECRET?: string;

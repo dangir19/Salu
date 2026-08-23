@@ -29,6 +29,13 @@
       "when": 1755938400000,
       "tag": "0003_provider_applications",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1755945600000,
+      "tag": "0004_provider_workspace",
+      "breakpoints": true
     }
   ]
 }

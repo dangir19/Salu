@@ -14,12 +14,14 @@ import {
   toUiBooking,
 } from "../bookings/service.ts";
 import {applyCreditEntry, rememberMember, resetPaymentMemory} from "../payments/ledger.ts";
+import {resetProviderWorkspaceMemory} from "../provider/service.ts";
 import type {Member} from "../domain/types.ts";
 
 async function seedMember(id = "member_ava"): Promise<Member> {
   resetMemberMemory();
   resetPaymentMemory();
   resetBookingMemory();
+  resetProviderWorkspaceMemory();
   return rememberMember({
     id,
     email: `${id}@joinsalu.com`,

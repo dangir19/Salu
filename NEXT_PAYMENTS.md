@@ -12,6 +12,7 @@ This file is only the **Connect** follow-up. Do **not** treat wallet contributio
 - D1 `wallets`, `credit_transactions`, `stripe_events` plus `members.stripe_customer_id` / `stripe_subscription_id`
 - Member booking create / list / reschedule / cancel on D1 (`BOOKINGS.md`) — Credit spend/refund stays on the wallet ledger
 - Provider applications on D1 (`PROVIDERS.md`) — BD pipeline only; not Connect onboarding
+- Provider request queue and calendar (`PROVIDER.md`) — assignment only; no transfers
 - Profile billing reads `/api/payments/me` (card last4 when Stripe has one)
 - Demo fallback when `STRIPE_SECRET_KEY` is missing
 

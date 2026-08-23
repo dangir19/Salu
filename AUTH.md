@@ -35,6 +35,7 @@ Do this **before the first real member can sign in** on a hosted URL (joinsalu.c
 | `AUTH_APPLE_TEAM_ID` | Apple (alt) | 10-character Team ID. |
 | `AUTH_APPLE_KEY_ID` | Apple (alt) | Key ID for the `.p8` Sign in with Apple key. |
 | `AUTH_APPLE_PRIVATE_KEY` | Apple (alt) | Full `.p8` body. Use `\n` for newlines in env vars. |
+| `SALU_PROVIDER_EMAILS` | Provider workspace | Optional comma-separated Google/Apple emails that open `/provider` as Tide & Tone until an approved Apply row exists. See [PROVIDER.md](./PROVIDER.md). |
 
 Copy `.env.example` to `.env` for Vite, or `.dev.vars` for Wrangler.
 
@@ -109,11 +110,12 @@ Shown only when `NODE_ENV` is not `production`. Labeled **Development only · la
 
 | Path | Role |
 | --- | --- |
-| `/signin` | Hospitality sign-in |
+| `/signin` | Hospitality member sign-in |
+| `/provider/signin` | Provider sign-in (same Auth.js; demo Tide & Tone in development) |
 | `/api/auth/*` | Auth.js (signin, callback, signout, csrf, session) |
-| `/api/me` | Combined member session (Auth.js JWT + ChatGPT headers + provider flags) |
+| `/api/me` | Combined member + provider session (Auth.js JWT + ChatGPT headers + provider flags) |
 
-Logged-out visitors hitting the member shell (`/`, `/atlas`, `/explore`, …) see `/signin` first. Apply, provider workspace, and admin stay public. Admin status writes are open unless `SALU_OPS_SECRET` is set (see [PROVIDERS.md](./PROVIDERS.md)).
+Logged-out visitors hitting the member shell (`/`, `/atlas`, `/explore`, …) see `/signin` first. Apply, provider workspace, and admin stay public. `/provider` shows the labeled demo plus application lookup until a provider session exists. Admin status writes are open unless `SALU_OPS_SECRET` is set. See [PROVIDERS.md](./PROVIDERS.md) and [PROVIDER.md](./PROVIDER.md).
 
 ## Member storage
 

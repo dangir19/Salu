@@ -1,7 +1,7 @@
-export type Page = "home"|"atlas"|"discover"|"packages"|"about"|"apps"|"wallet"|"bookings"|"household"|"offers"|"pricing"|"onboard"|"provider-apply"|"provider"|"admin"|"signin";
+export type Page = "home"|"atlas"|"discover"|"packages"|"about"|"apps"|"wallet"|"bookings"|"household"|"offers"|"pricing"|"onboard"|"provider-apply"|"provider"|"provider-signin"|"admin"|"signin";
 export type Service = {id:string;name:string;providerId:string;provider:string;category:string;mode:"At home"|"Virtual"|"Provider location"|"At hotel";area:string;price:number;standardPrice:number;duration:string;rating:number;reviews:number;next:string;description:string;clinical?:boolean;lawful?:string;source?:"demo"|"application"};
 export type ProviderProfile = {id:string;name:string;initials:string;credential:string;focuses:string[];funFact:string;years:number;area:string;rating:number;reviews:number;next:string;serviceId:string;source?:"demo"|"application"};
-export type Booking = {id:string;serviceId:string;serviceName:string;provider:string;date:string;mode:string;credits:number;status:"Upcoming"|"Completed"|"Cancelled";packageName?:string;packageItem?:string};
+export type Booking = {id:string;serviceId:string;serviceName:string;provider:string;date:string;mode:string;credits:number;status:"Upcoming"|"Completed"|"Cancelled";packageName?:string;packageItem?:string;assignment?:"unassigned"|"accepted"|"proposed"|"declined";proposedDate?:string};
 export type PackageProduct = {id:string;name:string;price:number;expires:string;items:{label:string;count:number}[]};
 
 export const services: Service[] = [

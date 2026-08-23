@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {useState} from "react";
 import type {AuthSurface} from "../auth/env";
 
@@ -99,6 +100,112 @@ export default function SignIn({
         {notice && <p className="signin-notice" role="status">{notice}</p>}
         <p className="signin-footnote">
           Independent providers deliver every service. Atlas does not diagnose or prescribe. For emergencies, call 911.
+        </p>
+        <p className="signin-switch">
+          <Link href="/provider/signin">Provider sign-in</Link>
+        </p>
+      </section>
+    </div>
+  );
+}
+
+export function ProviderSignIn({
+  returnTo = "/provider",
+  surface,
+}: {
+  returnTo?: string;
+  surface: AuthSurface;
+}) {
+  const [busy, setBusy] = useState<ProviderId | "provider-development" | null>(null);
+  const [notice, setNotice] = useState("");
+  const safeReturn = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/provider";
+
+  const start = async (provider: ProviderId | "provider-development", configured: boolean, missing: string) => {
+    if (!configured) {
+      setNotice(missing);
+      return;
+    }
+    setBusy(provider);
+    setNotice("");
+    try {
+      const csrfRes = await fetch("/api/auth/csrf");
+      if (!csrfRes.ok) throw new Error("csrf");
+      const {csrfToken} = (await csrfRes.json()) as {csrfToken?: string};
+      if (!csrfToken) throw new Error("csrf");
+      const form = document.createElement("form");
+      form.method = "POST";
+      form.action = `/api/auth/signin/${provider}`;
+      form.append(hidden("csrfToken", csrfToken));
+      form.append(hidden("callbackUrl", safeReturn === "/provider/signin" ? "/provider" : safeReturn));
+      document.body.append(form);
+      form.submit();
+    } catch {
+      setBusy(null);
+      setNotice("We couldn’t start provider sign-in just now. Please try again in a moment.");
+    }
+  };
+
+  return (
+    <div className="salu-app signin-page">
+      <a className="skip-link" href="#signin-card">Skip to provider sign in</a>
+      <div className="signin-brand">
+        <span className="wordmark">salu<span>°</span></span>
+        <p>Your health concierge.</p>
+        <small>Miami · independent providers, filling live requests.</small>
+      </div>
+      <section className="signin-card" id="signin-card">
+        <span className="eyebrow">PROVIDERS</span>
+        <h1>Come in. The request queue is waiting.</h1>
+        <p className="signin-copy">
+          Provider sessions are distinct from membership. After approval, the same Google or Apple account opens this workspace with <strong>role=provider</strong>.
+        </p>
+        <button
+          type="button"
+          className="signin-google"
+          disabled={busy !== null}
+          onClick={() =>
+            start(
+              "google",
+              surface.google,
+              "Google sign-in is not configured on this deployment. Add AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET — see AUTH.md.",
+            )
+          }
+        >
+          <GoogleMark />
+          {busy === "google" ? "Opening Google…" : "Continue with Google"}
+        </button>
+        <button
+          type="button"
+          className="signin-apple"
+          disabled={busy !== null}
+          onClick={() =>
+            start(
+              "apple",
+              surface.apple,
+              "Apple sign-in is not configured on this deployment. Add your Services ID and key — see AUTH.md.",
+            )
+          }
+        >
+          <AppleMark />
+          {busy === "apple" ? "Opening Apple…" : "Continue with Apple"}
+        </button>
+        {surface.development && (
+          <button
+            type="button"
+            className="signin-dev"
+            disabled={busy !== null}
+            onClick={() => start("provider-development", true, "")}
+          >
+            {busy === "provider-development" ? "Opening Tide & Tone…" : "Continue as Tide & Tone"}
+            <small>Development only · labeled demo provider · not Stripe Connect</small>
+          </button>
+        )}
+        {notice && <p className="signin-notice" role="status">{notice}</p>}
+        <p className="signin-footnote">
+          Payouts are not live yet. Accepting a request assigns the visit in-app. See PROVIDER.md.
+        </p>
+        <p className="signin-switch">
+          <Link href="/signin">Member sign-in</Link>
         </p>
       </section>
     </div>

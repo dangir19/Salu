@@ -2,14 +2,14 @@
 
 Head of BD can run a Miami pipeline of **individual** providers from **Apply to Salu** (`/apply`) through **Admin** (`/admin`). Salu recruits named LMTs and other solo licensed people — not multi-therapist spa brands, unless BD is taking a specific therapist off a roster. Applications persist on the server (D1). Refreshing the browser does **not** drop a real submission.
 
-Provider **accounts** and scheduling are a follow-on. This surface is apply + review only.
+This surface is apply + review only. Provider login and the request calendar live in [PROVIDER.md](./PROVIDER.md).
 
 ## Who owns what
 
 | Owner | Owns | Does not own |
 | --- | --- | --- |
 | **Head of BD** | Outreach to named people, the Apply URL, interviews, collecting license/insurance **proof** offline, docs status, moving `submitted` → `under_review` → `approved` / `rejected`, Brickell / Miami Beach / Miami-Dade coverage, rate conversations | D1 schema, APIs, Explore merge, Stripe Connect, credential-verification products, provider login, calendars |
-| **Eng** | `/apply` form, D1 `provider_applications`, `/api/providers/*`, admin filter + status + docs, approved individuals in the Explore catalog, labeled demo fallbacks | Vendor outreach, interviewing, deciding who is approved, live license registries, payouts, full provider accounts |
+| **Eng** | `/apply` form, D1 `provider_applications`, `/api/providers/*`, admin filter + status + docs, approved individuals in the Explore catalog, labeled demo fallbacks, provider workspace ([PROVIDER.md](./PROVIDER.md)) | Vendor outreach, interviewing, deciding who is approved, live license registries, payouts |
 
 Point independent providers at **https://joinsalu.com/apply** (or the Worker preview `/apply`). BD reviews them at `/admin`.
 
@@ -59,15 +59,16 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0000_members.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0001_payments.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0003_provider_applications.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0004_provider_workspace.sql
 ```
 
-`0003_provider_applications.sql` adds `provider_applications` (legal name, FL license type/number, mobile/at-home, neighborhoods, rate ask, docs status). The Worker also `CREATE TABLE IF NOT EXISTS` on first use.
+`0003_provider_applications.sql` adds `provider_applications` (legal name, FL license type/number, mobile/at-home, neighborhoods, rate ask, docs status). The request queue and calendar tables are in `0004_provider_workspace.sql` ([PROVIDER.md](./PROVIDER.md)). The Worker also `CREATE TABLE IF NOT EXISTS` on first use.
 
 ## Still demo
 
 - Explore mock catalog (Tide & Tone portraits, years, fun facts) — labeled **FABRICATED DEMO**
-- Provider calendar, availability inventory, and payout economics
-- Provider accounts / sign-in (email lookup only)
+- Unsigned `/provider` glance calendar and payout economics (signed-in queue is [PROVIDER.md](./PROVIDER.md))
+- Availability inventory
 - Stripe Connect / `ProviderPayout` ([NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md))
 - Live license, insurance, or background-check integrations
 - Atlas LLM, Cloudflare DNS cutover ([CUTOVER.md](./CUTOVER.md))

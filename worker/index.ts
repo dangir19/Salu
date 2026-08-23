@@ -15,6 +15,7 @@ interface Env {
   AUTH_APPLE_KEY_ID?: string;
   AUTH_APPLE_PRIVATE_KEY?: string;
   SALU_OPS_SECRET?: string;
+  SALU_PROVIDER_EMAILS?: string;
   STRIPE_SECRET_KEY?: string;
   STRIPE_PUBLISHABLE_KEY?: string;
   STRIPE_WEBHOOK_SECRET?: string;
@@ -69,6 +70,11 @@ const worker = {
     if (url.pathname.startsWith("/api/atlas")) {
       const {handleAtlasFetch} = await import("../atlas/handlers");
       return handleAtlasFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
+    if (url.pathname === "/api/provider" || url.pathname.startsWith("/api/provider/")) {
+      const {handleProviderFetch} = await import("../provider/handlers");
+      return handleProviderFetch(request, env as unknown as Record<string, string | undefined>);
     }
 
     if (url.pathname === "/_vinext/image") {

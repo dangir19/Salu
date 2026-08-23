@@ -39,7 +39,7 @@ pnpm test
 - Service and provider details, time selection, checkout, rescheduling and cancellation
 - Single-member profile, member offers, and Apply to Salu (persisted **individual** LMT / solo-provider applications)
 - Runna-first connected-app demo plus Strava, Apple Health, Garmin, Oura, Whoop and Calendar placeholders
-- Provider workspace: live application lookup plus labeled demo appointments and payout economics
+- Provider sign-in (distinct from member) with a live appointment-request queue, accept / decline / propose, and a calendar of accepted jobs; unsigned `/provider` keeps Apply lookup plus a labeled Tide & Tone demo ([PROVIDER.md](./PROVIDER.md), [PROVIDERS.md](./PROVIDERS.md))
 - Admin Miami pipeline (list / filter / status) plus a labeled demo of wallet contributions, GMV, and Salu net revenue
 - Responsive editorial layouts, compact mobile navigation, accessible controls and compliance boundaries
 
@@ -57,6 +57,7 @@ app/
   api/bookings        Member create / list / reschedule / cancel
   api/atlas           Concierge turn: tools, safety, optional OpenAI
   api/providers       Apply, catalog, and admin pipeline
+  api/provider        Provider session, request queue, schedule
   api/stripe/webhook  Signed Stripe events → membership + Credits
   chatgpt-auth.ts     OpenAI Sites header identity
 components/
@@ -71,8 +72,9 @@ domain/
 bookings/             Member booking service, catalog prices, handlers
 atlas/                Deterministic planner, tools, optional OpenAI, handlers
 providers/            Application service, Miami catalog mapping, handlers
-db/                   D1/Drizzle members, wallets, credit ledger, bookings, applications
-worker/               Cloudflare entry; auth + payments + bookings + Atlas + providers intercept
+provider/             Provider session, request queue, schedule
+db/                   D1/Drizzle members, wallets, credit ledger, bookings, applications, provider workspace
+worker/               Cloudflare entry; auth + payments + bookings + Atlas + providers + provider intercept
 wrangler.jsonc        Production Worker `salu` (CI deploy; no joinsalu.com route)
 .github/workflows/    Verify on PRs; deploy to Workers on `main`
 DEPLOY.md / CUTOVER.md Cloudflare token, secrets, and DNS switch
@@ -81,13 +83,13 @@ ATLAS.md              Concierge tools, safety, and optional language-model path
 tests/                Render/build, auth identity, payments, deploy-config, booking, provider, and Atlas tool checks
 ```
 
-Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin`. Approved individuals appear in Explore; the mock catalog stays a labeled **demo**. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)** and **[PROVIDERS.md](./PROVIDERS.md)**.
+Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Those bookings also open assignable provider requests (`/api/provider/requests`). Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin`. Approved individuals appear in Explore and can sign in with `role=provider`. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)**, **[PROVIDERS.md](./PROVIDERS.md)**, and **[PROVIDER.md](./PROVIDER.md)**.
 
 ## Production next steps
 
-1. Persist package entitlements and availability holds in D1; add row-level access and audit logging (members, Credits, bookings, and provider applications are in place).
-2. Apply `drizzle/0001_payments.sql`, `drizzle/0002_bookings.sql`, and `drizzle/0003_provider_applications.sql` in Cloudflare D1 if you want the tables before the first webhook, reservation, or application; see `STRIPE.md`, `BOOKINGS.md`, and `PROVIDERS.md`.
-3. Connect Stripe Connect for provider payouts; recognize commissions separately from customer wallet liabilities. See `NEXT_PAYMENTS.md`.
+1. Persist package entitlements and availability holds in D1; add row-level access and audit logging (members, Credits, bookings, provider applications, and request assignments are in place).
+2. Apply `drizzle/0001_payments.sql`, `drizzle/0002_bookings.sql`, `drizzle/0003_provider_applications.sql`, and `drizzle/0004_provider_workspace.sql` in Cloudflare D1 if you want the tables before the first webhook, reservation, or application; see `STRIPE.md`, `BOOKINGS.md`, `PROVIDERS.md`, and `PROVIDER.md`.
+3. Connect Stripe Connect for provider payouts; recognize commissions separately from customer wallet liabilities. See `NEXT_PAYMENTS.md`. Provider request assignment is already in `PROVIDER.md`.
 4. Add live license / insurance verification integrations; never treat Apply attestations or prototype fields as verified.
 5. Optional: set `OPENAI_API_KEY` so Atlas can use a language model on top of the same discover / availability / booking tools. Reschedule and cancel from chat are still follow-ups.
 6. Add integration consent, token storage and official APIs for Runna/Strava/etc. only after partnership and privacy review.

@@ -51,6 +51,13 @@ const LICENSE_SERVICES: Record<ProviderLicenseType, string[]> = {
   Other: ["deep-tissue"],
 };
 
+export function serviceKeysForLicense(licenseType?: string): string[] {
+  if (licenseType && licenseType in LICENSE_SERVICES) {
+    return [...LICENSE_SERVICES[licenseType as ProviderLicenseType]];
+  }
+  return [...LICENSE_SERVICES.Other];
+}
+
 const liveServices = new Map<string, Service>();
 
 export function rememberLiveServices(rows: Service[]): void {

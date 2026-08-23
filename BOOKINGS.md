@@ -39,12 +39,14 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 
 `0002_bookings.sql` adds `bookings` (`member_id`, service snapshot, display `date`, `status`, `credits_charged`, optional package fields). No extra env keys are required for bookings.
 
+A confirmed reservation also opens an assignable **appointment request** for the catalog practice. Providers fill those in [PROVIDER.md](./PROVIDER.md).
+
 You do **not** need live Stripe or Auth secrets to compile, lint, or test.
 
 ## Still demo
 
 - Package **remaining-session counts** stay in the browser. A booking can record `packageName` / `packageItem` and skip Credits; the pack inventory is not a D1 entitlement table yet.
-- Provider and admin **calendars** stay prototype / local. Head of BD owns the Miami supplier pipeline (outreach, interviews, status); eng owns persistence and APIs — see [PROVIDERS.md](./PROVIDERS.md).
+- Head of BD owns the Miami supplier pipeline (outreach, interviews, status); eng owns persistence and APIs — see [PROVIDERS.md](./PROVIDERS.md). The live provider request queue and calendar are in [PROVIDER.md](./PROVIDER.md).
 - Availability inventory is the Miami catalog (`domain/mock-data.ts`), not a held-slot table. Approved individual providers can appear in Explore; the mock catalog stays a labeled **demo**.
 - Stripe Connect / `ProviderPayout` is still the next payments step ([NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md)).
 - Atlas now books through this API; the optional language-model key, Cloudflare DNS cutover, and live credential-verification integrations are unchanged. See [ATLAS.md](./ATLAS.md).
