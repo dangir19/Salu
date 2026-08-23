@@ -37,7 +37,7 @@ pnpm test
 - Credit deduction, transaction history and package purchase/entitlements
 - Searchable Miami marketplace across at-home, virtual, hotel and provider-location modes
 - Service and provider details, time selection, checkout, rescheduling and cancellation
-- Single-member profile, member offers, and Apply to Salu (persisted provider applications)
+- Single-member profile, member offers, and Apply to Salu (persisted **individual** LMT / solo-provider applications)
 - Runna-first connected-app demo plus Strava, Apple Health, Garmin, Oura, Whoop and Calendar placeholders
 - Provider workspace: live application lookup plus labeled demo appointments and payout economics
 - Admin Miami pipeline (list / filter / status) plus a labeled demo of wallet contributions, GMV, and Salu net revenue
@@ -78,7 +78,7 @@ DEPLOY.md / CUTOVER.md Cloudflare token, secrets, and DNS switch
 tests/                Render/build, auth identity, payments, deploy-config, booking, and provider API checks
 ```
 
-Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews them at `/admin`. Approved suppliers appear in Explore; the mock catalog stays a labeled **demo**. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)** and **[PROVIDERS.md](./PROVIDERS.md)**.
+Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin`. Approved individuals appear in Explore; the mock catalog stays a labeled **demo**. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)** and **[PROVIDERS.md](./PROVIDERS.md)**.
 
 ## Production next steps
 

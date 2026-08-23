@@ -1,28 +1,27 @@
 import {services as mockServices, type ProviderProfile, type Service} from "../domain/mock-data";
-import type {ProviderApplication} from "../domain/types";
+import type {ProviderApplication, ProviderLicenseType} from "../domain/types";
 
-export const PROVIDER_NEIGHBORHOODS = [
-  "Brickell",
-  "Miami Beach",
-  "Miami-Dade",
-  "Coral Gables",
-  "Coconut Grove",
-  "Wynwood",
-  "Design District",
-  "Midtown",
-  "Key Biscayne",
-  "Edgewater",
+export const PROVIDER_NEIGHBORHOODS = ["Brickell", "Miami Beach", "Miami-Dade"] as const;
+
+export const PROVIDER_LICENSE_TYPES: ProviderLicenseType[] = [
+  "LMT",
+  "RN",
+  "Acupuncture Physician",
+  "Esthetician",
+  "Stretch practitioner",
+  "Other",
+];
+
+export const PROVIDER_RATE_ASKS = [
+  "$100 / visit",
+  "$125 / visit",
+  "$150 / visit",
+  "$175 / visit",
+  "$200 / visit",
+  "$250+ / visit",
 ] as const;
 
-export const PROVIDER_RATE_EXPECTATIONS = [
-  "Under $100 / visit",
-  "$100–150 / visit",
-  "$150–200 / visit",
-  "$200–300 / visit",
-  "$300+ / visit",
-] as const;
-
-export type ProviderServiceOption = {
+type ProviderServiceOption = {
   key: string;
   name: string;
   category: "Recovery" | "Aesthetic" | "Clinical";
@@ -30,7 +29,7 @@ export type ProviderServiceOption = {
   defaultPrice: number;
 };
 
-export const PROVIDER_SERVICE_OPTIONS: ProviderServiceOption[] = [
+const SERVICE_OPTIONS: ProviderServiceOption[] = [
   {key: "deep-tissue", name: "Deep Tissue Massage", category: "Recovery", duration: "60 min", defaultPrice: 150},
   {key: "sports-massage", name: "Sports Massage", category: "Recovery", duration: "60 min", defaultPrice: 150},
   {key: "stretch", name: "Assisted Stretching", category: "Recovery", duration: "45 min", defaultPrice: 100},
@@ -42,6 +41,15 @@ export const PROVIDER_SERVICE_OPTIONS: ProviderServiceOption[] = [
   {key: "nad", name: "NAD+ Drip", category: "Clinical", duration: "90 min", defaultPrice: 300},
   {key: "acupuncture", name: "Acupuncture", category: "Recovery", duration: "60 min", defaultPrice: 150},
 ];
+
+const LICENSE_SERVICES: Record<ProviderLicenseType, string[]> = {
+  LMT: ["deep-tissue", "sports-massage", "lymphatic-massage"],
+  RN: ["blood-draw", "iv"],
+  "Acupuncture Physician": ["acupuncture"],
+  Esthetician: ["facial", "facial-workout"],
+  "Stretch practitioner": ["stretch"],
+  Other: ["deep-tissue"],
+};
 
 const liveServices = new Map<string, Service>();
 
@@ -70,11 +78,11 @@ export function parseLiveServiceId(serviceId: string): {applicationId: string; s
   return {applicationId: rest.slice(0, separator), serviceKey: rest.slice(separator + 1)};
 }
 
-export function optionForServiceName(name: string): ProviderServiceOption | null {
-  return PROVIDER_SERVICE_OPTIONS.find((option) => option.name === name || option.key === name) ?? null;
+export function optionForServiceKey(key: string): ProviderServiceOption | null {
+  return SERVICE_OPTIONS.find((option) => option.key === key) ?? null;
 }
 
-export function rateFromExpectation(text: string, fallback = 150): number {
+export function rateFromAsk(text: string, fallback = 150): number {
   const match = text.replace(/,/g, "").match(/(\d{2,4})/);
   return match ? Number(match[1]) : fallback;
 }
@@ -85,24 +93,28 @@ function initialsFor(name: string): string {
   return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? "").join("") || "S";
 }
 
+export function servicesForLicense(licenseType: ProviderLicenseType): ProviderServiceOption[] {
+  return (LICENSE_SERVICES[licenseType] ?? LICENSE_SERVICES.Other)
+    .map((key) => optionForServiceKey(key))
+    .filter((option): option is ProviderServiceOption => Boolean(option));
+}
+
 export function catalogFromApplication(application: ProviderApplication): {services: Service[]; provider: ProviderProfile} | null {
   if (application.status !== "approved") return null;
   const area = application.neighborhoods[0] ?? "Miami-Dade";
-  const mapped = application.services
-    .map((name) => optionForServiceName(name))
-    .filter((option): option is ProviderServiceOption => Boolean(option));
+  const mapped = servicesForLicense(application.licenseType);
   if (!mapped.length) return null;
 
-  const price = rateFromExpectation(application.rateExpectation, mapped[0]?.defaultPrice ?? 150);
+  const price = rateFromAsk(application.rateAsk, mapped[0]?.defaultPrice ?? 150);
   const services = mapped.map((option) => {
     const mock = mockServices.find((service) => service.id === option.key);
     return {
       id: liveServiceId(application.id, option.key),
       name: option.name,
       providerId: application.id,
-      provider: application.businessName,
+      provider: application.fullName,
       category: option.category,
-      mode: mock?.mode ?? "At home",
+      mode: application.mobileAtHome ? "At home" : (mock?.mode ?? "At home"),
       area,
       price,
       standardPrice: price,
@@ -110,7 +122,7 @@ export function catalogFromApplication(application: ProviderApplication): {servi
       rating: 0,
       reviews: 0,
       next: "Request with Atlas",
-      description: `Independent ${option.name.toLowerCase()} with ${application.businessName} across ${application.neighborhoods.join(", ")}. Typical visit ${application.rateExpectation}. License and insurance are self-attested — Salu has not completed credential verification.`,
+      description: `${application.fullName}, ${application.licenseType} (${application.licenseNumber}), serving ${application.neighborhoods.join(", ")}. Rate ask ${application.rateAsk}. Florida license number is self-reported — Salu has not verified credentials.`,
       clinical: mock?.clinical,
       lawful: mock?.lawful,
       source: "application" as const,
@@ -124,11 +136,11 @@ export function catalogFromApplication(application: ProviderApplication): {servi
     services,
     provider: {
       id: application.id,
-      name: application.businessName,
-      initials: initialsFor(application.businessName),
-      credential: "Self-attested · pending verification",
+      name: application.fullName,
+      initials: initialsFor(application.fullName),
+      credential: `${application.licenseType} · ${application.licenseNumber} · self-reported`,
       focuses: mapped.map((option) => option.name),
-      funFact: application.neighborhoods.join(" · "),
+      funFact: application.mobileAtHome ? "Mobile / at-home" : "In-clinic only",
       years: 0,
       area,
       rating: 0,

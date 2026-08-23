@@ -78,9 +78,9 @@ export const pageDescriptions: Record<Page,string>={
  offers:"Quietly useful member moments selected around your membership.",
  pricing:"Member is free. Gold is $200 monthly for 10% off. Platinum is $500 monthly for 20% off.",
  onboard:"Join Salu and start a demo membership with Credits ready to use.",
- "provider-apply":"Apply to bring exceptional independent care to Salu members in Miami.",
- provider:"Lightweight provider workspace for your Salu application, plus a labeled demo calendar.",
- admin:"Miami supplier pipeline plus a labeled demo operating view of funds and volume.",
+ "provider-apply":"Apply as a named independent provider — LMT or other solo licensed person — in Miami.",
+ provider:"Lightweight workspace for your individual Salu application, plus a labeled demo calendar.",
+ admin:"Miami review queue for named providers, plus a labeled demo operating view of funds and volume.",
  signin:"Continue with Google or Apple to open your Salu membership.",
 };
 

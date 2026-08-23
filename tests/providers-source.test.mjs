@@ -15,10 +15,12 @@ test("wires Apply, catalog, and admin pipeline APIs with a labeled demo catalog"
     "/api/providers/apply",
     "/api/providers/catalog",
     "/api/providers/applications",
-    "MIAMI SUPPLIERS · FROM THE BD PIPELINE",
+    "INDEPENDENT PROVIDERS · FROM THE BD PIPELINE",
     "AT-HOME SERVICES · DEMO CATALOG",
     "INDEPENDENT EXPERTS · FABRICATED DEMO",
     "Submit application",
+    "Florida license number",
+    "Mobile / at-home",
     "Miami pipeline",
   ]) {
     assert.match(app, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -32,12 +34,15 @@ test("wires Apply, catalog, and admin pipeline APIs with a labeled demo catalog"
 test("documents BD vs eng and what stays demo", () => {
   for (const term of [
     "Head of BD",
+    "individual",
+    "LMT",
+    "License number",
     "submitted",
     "under_review",
     "approved",
     "rejected",
     "drizzle/0003_provider_applications.sql",
-    "self-attest",
+    "docs",
     "Stripe Connect",
     "demo catalog",
   ]) {

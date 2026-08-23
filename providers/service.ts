@@ -1,11 +1,11 @@
-import type {ProviderApplication, ProviderApplicationStatus} from "../domain/types";
+import type {ProviderApplication, ProviderApplicationStatus, ProviderDocStatus, ProviderLicenseType} from "../domain/types";
 import type {ProviderProfile, Service} from "../domain/mock-data";
 import {
   catalogFromApplication,
-  optionForServiceName,
   parseLiveServiceId,
+  PROVIDER_LICENSE_TYPES,
   PROVIDER_NEIGHBORHOODS,
-  PROVIDER_RATE_EXPECTATIONS,
+  PROVIDER_RATE_ASKS,
   rememberLiveServices,
 } from "./catalog";
 
@@ -25,6 +25,16 @@ export const APPLICATION_STATUSES: ProviderApplicationStatus[] = [
   "rejected",
 ];
 
+export const DOC_STATUSES: ProviderDocStatus[] = ["missing", "received"];
+
+export type ApplicationListFilter = {
+  status?: ProviderApplicationStatus;
+  neighborhood?: string;
+  mobile?: boolean;
+  licenseType?: ProviderLicenseType;
+  docs?: "missing_license" | "missing_insurance" | "complete";
+};
+
 const memory = new Map<string, ProviderApplication>();
 
 export function resetProviderMemory(): void {
@@ -39,11 +49,28 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-function cleanList(values: unknown, allowed?: readonly string[]): string[] {
+function cleanNeighborhoods(values: unknown): string[] {
   if (!Array.isArray(values)) return [];
-  const unique = [...new Set(values.map((value) => String(value).trim()).filter(Boolean))];
-  if (!allowed) return unique;
-  return unique.filter((value) => allowed.includes(value) || Boolean(optionForServiceName(value)));
+  return [...new Set(values.map((value) => String(value).trim()).filter((value) => (PROVIDER_NEIGHBORHOODS as readonly string[]).includes(value)))];
+}
+
+function isLicenseType(value: string): value is ProviderLicenseType {
+  return (PROVIDER_LICENSE_TYPES as string[]).includes(value);
+}
+
+function isDocStatus(value: string): value is ProviderDocStatus {
+  return DOC_STATUSES.includes(value as ProviderDocStatus);
+}
+
+function matchesFilter(row: ProviderApplication, filter: ApplicationListFilter): boolean {
+  if (filter.status && row.status !== filter.status) return false;
+  if (filter.neighborhood && !row.neighborhoods.includes(filter.neighborhood)) return false;
+  if (typeof filter.mobile === "boolean" && row.mobileAtHome !== filter.mobile) return false;
+  if (filter.licenseType && row.licenseType !== filter.licenseType) return false;
+  if (filter.docs === "missing_license" && row.docsLicenseProof !== "missing") return false;
+  if (filter.docs === "missing_insurance" && row.docsInsurance !== "missing") return false;
+  if (filter.docs === "complete" && (row.docsLicenseProof !== "received" || row.docsInsurance !== "received")) return false;
+  return true;
 }
 
 async function persistApplication(application: ProviderApplication): Promise<void> {
@@ -56,6 +83,8 @@ async function persistApplication(application: ProviderApplication): Promise<voi
       await db.updateProviderApplication(application.id, {
         status: application.status,
         reviewNote: application.reviewNote,
+        docsLicenseProof: application.docsLicenseProof,
+        docsInsurance: application.docsInsurance,
         updatedAt: application.updatedAt,
       });
     } else {
@@ -81,20 +110,19 @@ async function storedApplication(id: string): Promise<ProviderApplication | null
   return memory.get(id) ?? null;
 }
 
-export async function listApplications(status?: ProviderApplicationStatus): Promise<ProviderApplication[]> {
+export async function listApplications(filter: ApplicationListFilter = {}): Promise<ProviderApplication[]> {
   try {
     const db = await import("../db/providers");
     await db.ensureProviderApplicationsSchema();
-    const persisted = await db.listProviderApplications(status);
+    const persisted = await db.listProviderApplications(filter.status);
     if (persisted) {
       for (const row of persisted) memory.set(row.id, row);
-      return persisted;
+      return persisted.filter((row) => matchesFilter(row, filter));
     }
   } catch {
     // Memory fallback.
   }
-  const rows = sortApplications([...memory.values()]);
-  return status ? rows.filter((row) => row.status === status) : rows;
+  return sortApplications([...memory.values()]).filter((row) => matchesFilter(row, filter));
 }
 
 export async function listApplicationsForEmail(email: string): Promise<ProviderApplication[]> {
@@ -120,7 +148,7 @@ export type ProviderCatalog = {
 };
 
 export async function listApprovedCatalog(): Promise<ProviderCatalog> {
-  const approved = (await listApplications("approved"))
+  const approved = (await listApplications({status: "approved"}))
     .map(catalogFromApplication)
     .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
   const services = approved.flatMap((entry) => entry.services);
@@ -141,54 +169,54 @@ export async function findApprovedCatalogService(serviceId: string): Promise<Ser
 }
 
 export async function submitApplication(input: {
-  businessName?: string;
-  contactName?: string;
+  fullName?: string;
   email?: string;
   phone?: string;
-  services?: unknown;
+  licenseType?: string;
+  licenseNumber?: string;
+  mobileAtHome?: unknown;
   neighborhoods?: unknown;
-  licenseAttested?: unknown;
+  rateAsk?: string;
   insuranceAttested?: unknown;
-  rateExpectation?: string;
-  website?: string;
   notes?: string;
 }): Promise<ProviderApplication> {
-  const businessName = input.businessName?.trim() ?? "";
-  const contactName = input.contactName?.trim() ?? "";
+  const fullName = input.fullName?.trim() ?? "";
   const email = normalizeEmail(input.email ?? "");
   const phone = input.phone?.trim();
-  const website = input.website?.trim();
+  const licenseType = input.licenseType?.trim() ?? "";
+  const licenseNumber = input.licenseNumber?.trim().toUpperCase() ?? "";
+  const neighborhoods = cleanNeighborhoods(input.neighborhoods);
+  const rateAsk = input.rateAsk?.trim() ?? "";
   const notes = input.notes?.trim();
-  const services = cleanList(input.services);
-  const neighborhoods = cleanList(input.neighborhoods, PROVIDER_NEIGHBORHOODS);
-  const rateExpectation = input.rateExpectation?.trim() ?? "";
-  const resolvedServices = services
-    .map((name) => optionForServiceName(name)?.name)
-    .filter((name): name is string => Boolean(name));
+  const mobileAtHome = input.mobileAtHome === true || input.mobileAtHome === "yes" || input.mobileAtHome === "true";
 
-  if (!businessName || !contactName) throw new ProviderError("Please share the practice name and who we should write to.");
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ProviderError("A working email helps us follow up.");
-  if (!resolvedServices.length) throw new ProviderError("Choose at least one service you would like to offer members.");
-  if (!neighborhoods.length) throw new ProviderError("Choose the Miami neighborhoods you already serve.");
-  if (!input.licenseAttested) throw new ProviderError("Please attest that you hold the licenses required for this work.");
-  if (!input.insuranceAttested) throw new ProviderError("Please attest that you carry appropriate professional liability insurance.");
-  if (!rateExpectation) throw new ProviderError("Share a typical visit rate so BD can place you in the Miami pipeline.");
-  const allowedRate = (PROVIDER_RATE_EXPECTATIONS as readonly string[]).includes(rateExpectation);
-  if (!allowedRate && rateExpectation.length > 80) throw new ProviderError("Keep the rate note short — a typical visit range is enough.");
+  if (!fullName) throw new ProviderError("Please share your full legal name.");
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ProviderError("A working email helps BD follow up.");
+  if (!isLicenseType(licenseType)) throw new ProviderError("Choose your Florida license type.");
+  if (!licenseNumber || licenseNumber.length < 4) throw new ProviderError("Add your Florida license number.");
+  if (typeof input.mobileAtHome !== "boolean" && input.mobileAtHome !== "yes" && input.mobileAtHome !== "no" && input.mobileAtHome !== "true" && input.mobileAtHome !== "false") {
+    throw new ProviderError("Tell us whether you can work mobile / at-home.");
+  }
+  if (!neighborhoods.length) throw new ProviderError("Choose Brickell, Miami Beach, and/or Miami-Dade.");
+  if (!rateAsk) throw new ProviderError("Share your rate ask so BD can place you in the Miami pipeline.");
+  const allowedRate = (PROVIDER_RATE_ASKS as readonly string[]).includes(rateAsk);
+  if (!allowedRate && rateAsk.length > 80) throw new ProviderError("Keep the rate ask short — a typical visit rate is enough.");
+  if (!input.insuranceAttested) throw new ProviderError("Please attest that you carry professional liability insurance, or will before seeing members.");
 
   const now = new Date().toISOString();
   const application: ProviderApplication = {
     id: `pa_${crypto.randomUUID()}`,
-    businessName,
-    contactName,
+    fullName,
     email,
     phone: phone || undefined,
-    services: resolvedServices,
+    licenseType,
+    licenseNumber,
+    mobileAtHome,
     neighborhoods,
-    licenseAttested: true,
+    rateAsk,
     insuranceAttested: true,
-    rateExpectation,
-    website: website || undefined,
+    docsLicenseProof: "missing",
+    docsInsurance: "missing",
     notes: notes || undefined,
     status: "submitted",
     createdAt: now,
@@ -202,19 +230,31 @@ export async function updateApplicationStatus(input: {
   id?: string;
   status?: string;
   reviewNote?: string;
+  docsLicenseProof?: string;
+  docsInsurance?: string;
 }): Promise<ProviderApplication> {
   const id = input.id?.trim() ?? "";
-  const status = input.status?.trim() as ProviderApplicationStatus | undefined;
   if (!id) throw new ProviderError("Choose an application to update.");
-  if (!status || !APPLICATION_STATUSES.includes(status)) {
-    throw new ProviderError("Status must be submitted, under review, approved, or rejected.");
-  }
   const current = await storedApplication(id);
   if (!current) throw new ProviderError("That application is not in the Miami pipeline.", 404);
+
+  const status = input.status?.trim();
+  if (status && !APPLICATION_STATUSES.includes(status as ProviderApplicationStatus)) {
+    throw new ProviderError("Status must be submitted, under review, approved, or rejected.");
+  }
+  if (input.docsLicenseProof && !isDocStatus(input.docsLicenseProof)) {
+    throw new ProviderError("License proof must be missing or received.");
+  }
+  if (input.docsInsurance && !isDocStatus(input.docsInsurance)) {
+    throw new ProviderError("Insurance docs must be missing or received.");
+  }
+
   const next: ProviderApplication = {
     ...current,
-    status,
-    reviewNote: input.reviewNote?.trim() || current.reviewNote,
+    status: (status as ProviderApplicationStatus | undefined) ?? current.status,
+    reviewNote: input.reviewNote !== undefined ? (input.reviewNote.trim() || undefined) : current.reviewNote,
+    docsLicenseProof: input.docsLicenseProof && isDocStatus(input.docsLicenseProof) ? input.docsLicenseProof : current.docsLicenseProof,
+    docsInsurance: input.docsInsurance && isDocStatus(input.docsInsurance) ? input.docsInsurance : current.docsInsurance,
     updatedAt: new Date().toISOString(),
   };
   await persistApplication(next);

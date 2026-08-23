@@ -31,7 +31,9 @@
 .pipeline-toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin-bottom:8px}
 .pipeline-toolbar label{display:flex;flex-direction:column;gap:6px;font-size:11px;font-weight:700}
 .pipeline-toolbar input,.pipeline-toolbar select{border:1px solid var(--line);background:var(--ivory);border-radius:9px;padding:10px;min-width:180px}
-.pipeline-row{display:grid;grid-template-columns:1.3fr 1fr 160px 140px;gap:14px;padding:16px 0;border-top:1px solid var(--line);align-items:start}
+.pipeline-row{display:grid;grid-template-columns:1.4fr 1.2fr 160px 150px;gap:14px;padding:16px 0;border-top:1px solid var(--line);align-items:start}
+.pipeline-fields{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px;margin-top:8px}
+.pipeline-fields label{margin:0;font-size:11px;font-weight:700}
 .pipeline-row b{font-size:15px}
 .pipeline-row small{display:block;color:var(--muted);margin-top:4px}
 .pipeline-row select,.pipeline-note{border:1px solid var(--line);background:var(--ivory);border-radius:9px;padding:8px;width:100%}

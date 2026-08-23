@@ -1,5 +1,5 @@
 import {desc, eq, sql} from "drizzle-orm";
-import type {ProviderApplication, ProviderApplicationStatus} from "../domain/types";
+import type {ProviderApplication, ProviderApplicationStatus, ProviderDocStatus, ProviderLicenseType} from "../domain/types";
 import {getDb} from "./index";
 import {providerApplications} from "./schema";
 
@@ -15,16 +15,17 @@ function parseList(value: string): string[] {
 function applicationFromRow(row: typeof providerApplications.$inferSelect): ProviderApplication {
   return {
     id: row.id,
-    businessName: row.businessName,
-    contactName: row.contactName,
+    fullName: row.fullName,
     email: row.email,
     phone: row.phone ?? undefined,
-    services: parseList(row.services),
+    licenseType: row.licenseType as ProviderLicenseType,
+    licenseNumber: row.licenseNumber,
+    mobileAtHome: Boolean(row.mobileAtHome),
     neighborhoods: parseList(row.neighborhoods),
-    licenseAttested: Boolean(row.licenseAttested),
+    rateAsk: row.rateAsk,
     insuranceAttested: Boolean(row.insuranceAttested),
-    rateExpectation: row.rateExpectation,
-    website: row.website ?? undefined,
+    docsLicenseProof: row.docsLicenseProof as ProviderDocStatus,
+    docsInsurance: row.docsInsurance as ProviderDocStatus,
     notes: row.notes ?? undefined,
     status: row.status as ProviderApplicationStatus,
     reviewNote: row.reviewNote ?? undefined,
@@ -45,16 +46,17 @@ export async function ensureProviderApplicationsSchema(): Promise<boolean> {
   return Boolean(await withProvidersDb(async (db) => {
     await db.run(sql.raw(`CREATE TABLE IF NOT EXISTS provider_applications (
       id text PRIMARY KEY NOT NULL,
-      business_name text NOT NULL,
-      contact_name text NOT NULL,
+      full_name text NOT NULL,
       email text NOT NULL,
       phone text,
-      services text NOT NULL,
+      license_type text NOT NULL,
+      license_number text NOT NULL,
+      mobile_at_home integer DEFAULT 0 NOT NULL,
       neighborhoods text NOT NULL,
-      license_attested integer DEFAULT 0 NOT NULL,
+      rate_ask text NOT NULL,
       insurance_attested integer DEFAULT 0 NOT NULL,
-      rate_expectation text NOT NULL,
-      website text,
+      docs_license_proof text DEFAULT 'missing' NOT NULL,
+      docs_insurance text DEFAULT 'missing' NOT NULL,
       notes text,
       status text NOT NULL,
       review_note text,
@@ -64,6 +66,7 @@ export async function ensureProviderApplicationsSchema(): Promise<boolean> {
     try {
       await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS provider_applications_status_idx ON provider_applications (status)`));
       await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS provider_applications_email_idx ON provider_applications (email)`));
+      await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS provider_applications_license_type_idx ON provider_applications (license_type)`));
     } catch {
       // Index already exists, or the D1 dialect rejected IF NOT EXISTS.
     }
@@ -110,16 +113,17 @@ export async function insertProviderApplication(application: ProviderApplication
   return Boolean(await withProvidersDb(async (db) => {
     await db.insert(providerApplications).values({
       id: application.id,
-      businessName: application.businessName,
-      contactName: application.contactName,
+      fullName: application.fullName,
       email: application.email,
       phone: application.phone ?? null,
-      services: JSON.stringify(application.services),
+      licenseType: application.licenseType,
+      licenseNumber: application.licenseNumber,
+      mobileAtHome: application.mobileAtHome ? 1 : 0,
       neighborhoods: JSON.stringify(application.neighborhoods),
-      licenseAttested: application.licenseAttested ? 1 : 0,
+      rateAsk: application.rateAsk,
       insuranceAttested: application.insuranceAttested ? 1 : 0,
-      rateExpectation: application.rateExpectation,
-      website: application.website ?? null,
+      docsLicenseProof: application.docsLicenseProof,
+      docsInsurance: application.docsInsurance,
       notes: application.notes ?? null,
       status: application.status,
       reviewNote: application.reviewNote ?? null,
@@ -130,18 +134,19 @@ export async function insertProviderApplication(application: ProviderApplication
   }));
 }
 
-export async function updateProviderApplication(
-  id: string,
-  patch: Pick<ProviderApplication, "status" | "reviewNote" | "updatedAt">,
-): Promise<ProviderApplication | null> {
+export type ProviderApplicationPatch = Partial<Pick<ProviderApplication, "status" | "reviewNote" | "docsLicenseProof" | "docsInsurance" | "updatedAt">>;
+
+export async function updateProviderApplication(id: string, patch: ProviderApplicationPatch): Promise<ProviderApplication | null> {
   return withProvidersDb(async (db) => {
     const rows = await db.select().from(providerApplications).where(eq(providerApplications.id, id)).limit(1);
     const current = rows[0];
     if (!current) return null;
     const next = {
-      status: patch.status,
+      status: patch.status ?? current.status,
       reviewNote: patch.reviewNote === "" ? null : (patch.reviewNote ?? current.reviewNote),
-      updatedAt: patch.updatedAt,
+      docsLicenseProof: patch.docsLicenseProof ?? current.docsLicenseProof,
+      docsInsurance: patch.docsInsurance ?? current.docsInsurance,
+      updatedAt: patch.updatedAt ?? new Date().toISOString(),
     };
     await db.update(providerApplications).set(next).where(eq(providerApplications.id, id));
     return applicationFromRow({...current, ...next});

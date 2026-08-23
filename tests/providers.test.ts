@@ -5,7 +5,7 @@ import {
   catalogFromApplication,
   liveServiceId,
   parseLiveServiceId,
-  rateFromExpectation,
+  rateFromAsk,
   resetLiveCatalogMemory,
 } from "../providers/catalog.ts";
 import {
@@ -24,16 +24,16 @@ import {resetMemberMemory} from "../auth/members.ts";
 
 function validPayload(overrides: Record<string, unknown> = {}) {
   return {
-    businessName: "Palm Court Recovery",
-    contactName: "Elena Díaz",
+    fullName: "Elena Díaz",
     email: "elena@palmcourt.example",
     phone: "305-555-0148",
-    services: ["Deep Tissue Massage", "Sports Massage"],
+    licenseType: "LMT",
+    licenseNumber: "MA12345",
+    mobileAtHome: true,
     neighborhoods: ["Brickell", "Miami Beach"],
-    licenseAttested: true,
+    rateAsk: "$150 / visit",
     insuranceAttested: true,
-    rateExpectation: "$150–200 / visit",
-    notes: "Hotel and at-home, English and Spanish.",
+    notes: "Spanish and English. Hotel work is fine.",
     ...overrides,
   };
 }
@@ -41,35 +41,43 @@ function validPayload(overrides: Record<string, unknown> = {}) {
 test("parses live catalog ids and typical visit rates", () => {
   const id = liveServiceId("pa_abc", "deep-tissue");
   assert.deepEqual(parseLiveServiceId(id), {applicationId: "pa_abc", serviceKey: "deep-tissue"});
-  assert.equal(rateFromExpectation("$150–200 / visit"), 150);
-  assert.equal(rateFromExpectation("Under $100 / visit"), 100);
+  assert.equal(rateFromAsk("$150 / visit"), 150);
+  assert.equal(rateFromAsk("$100 / visit"), 100);
 });
 
-test("submits an application into the Miami pipeline without secrets", async () => {
+test("submits an individual LMT into the Miami pipeline without secrets", async () => {
   resetProviderMemory();
   const application = await submitApplication(validPayload());
   assert.equal(application.status, "submitted");
-  assert.equal(application.email, "elena@palmcourt.example");
+  assert.equal(application.fullName, "Elena Díaz");
+  assert.equal(application.licenseType, "LMT");
+  assert.equal(application.licenseNumber, "MA12345");
+  assert.equal(application.mobileAtHome, true);
   assert.deepEqual(application.neighborhoods, ["Brickell", "Miami Beach"]);
-  assert.equal(application.licenseAttested, true);
-  const listed = await listApplications("submitted");
+  assert.equal(application.docsLicenseProof, "missing");
+  assert.equal(application.docsInsurance, "missing");
+  const listed = await listApplications({status: "submitted"});
   assert.equal(listed.length, 1);
   assert.equal(listed[0]?.id, application.id);
 });
 
-test("rejects an application missing neighborhoods or attestations", async () => {
+test("rejects an application missing neighborhoods, license, or insurance attestation", async () => {
   resetProviderMemory();
   await assert.rejects(
     () => submitApplication(validPayload({neighborhoods: []})),
     (error: unknown) => error instanceof ProviderError,
   );
   await assert.rejects(
-    () => submitApplication(validPayload({licenseAttested: false})),
+    () => submitApplication(validPayload({licenseNumber: ""})),
+    (error: unknown) => error instanceof ProviderError,
+  );
+  await assert.rejects(
+    () => submitApplication(validPayload({insuranceAttested: false})),
     (error: unknown) => error instanceof ProviderError,
   );
 });
 
-test("approved applications appear in the catalog and stay out while under review", async () => {
+test("approved individuals appear in the catalog and stay out while under review", async () => {
   resetProviderMemory();
   resetLiveCatalogMemory();
   const application = await submitApplication(validPayload({email: "approved@joinsalu.com"}));
@@ -80,19 +88,44 @@ test("approved applications appear in the catalog and stay out while under revie
   assert.equal(approved.status, "approved");
   const catalog = await listApprovedCatalog();
   assert.equal(catalog.providers.length, 1);
-  assert.equal(catalog.providers[0]?.name, "Palm Court Recovery");
+  assert.equal(catalog.providers[0]?.name, "Elena Díaz");
   assert.equal(catalog.providers[0]?.source, "application");
   assert.ok(catalog.services.some((service) => service.name === "Deep Tissue Massage"));
-  assert.equal(catalogFromApplication(application)?.provider.name, undefined);
+  assert.equal(catalogFromApplication(application), null);
 
   const mapped = catalogFromApplication(approved);
   assert.ok(mapped);
   const service = await findApprovedCatalogService(mapped.services[0]!.id);
-  assert.equal(service?.provider, "Palm Court Recovery");
+  assert.equal(service?.provider, "Elena Díaz");
   assert.equal(findCatalogService(mapped.services[0]!.id)?.id, mapped.services[0]!.id);
 });
 
-test("members can book an approved supplier after BD approves", async () => {
+test("filters the review queue by neighborhood, mobile, and missing docs", async () => {
+  resetProviderMemory();
+  await submitApplication(validPayload({email: "brickell@joinsalu.com", neighborhoods: ["Brickell"], mobileAtHome: true}));
+  const clinic = await submitApplication(validPayload({
+    email: "clinic@joinsalu.com",
+    fullName: "Noah Bennett",
+    neighborhoods: ["Miami-Dade"],
+    mobileAtHome: false,
+    licenseNumber: "MA99999",
+  }));
+  await updateApplicationStatus({id: clinic.id, docsLicenseProof: "received", docsInsurance: "received"});
+
+  const brickell = await listApplications({neighborhood: "Brickell"});
+  assert.equal(brickell.length, 1);
+  assert.equal(brickell[0]?.fullName, "Elena Díaz");
+
+  const mobile = await listApplications({mobile: true});
+  assert.equal(mobile.length, 1);
+  const clinicOnly = await listApplications({mobile: false});
+  assert.equal(clinicOnly.length, 1);
+  const complete = await listApplications({docs: "complete"});
+  assert.equal(complete.length, 1);
+  assert.equal(complete[0]?.fullName, "Noah Bennett");
+});
+
+test("members can book an approved individual after BD approves", async () => {
   resetProviderMemory();
   resetLiveCatalogMemory();
   resetMemberMemory();
@@ -117,7 +150,7 @@ test("members can book an approved supplier after BD approves", async () => {
     mode: "At home · Brickell",
     enforceCredits: false,
   });
-  assert.equal(result.booking.provider, "Palm Court Recovery");
+  assert.equal(result.booking.provider, "Elena Díaz");
   assert.equal(result.booking.serviceName, service.name);
 });
 
@@ -129,9 +162,11 @@ test("provider apply API persists without Auth or Stripe secrets", async () => {
     body: JSON.stringify(validPayload({email: "api@joinsalu.com"})),
   }));
   assert.equal(created.status, 200);
-  const body = await created.json() as {source: string; application: {email: string; status: string}};
+  const body = await created.json() as {source: string; application: {fullName: string; status: string; docsLicenseProof: string}};
   assert.equal(body.source, "server");
   assert.equal(body.application.status, "submitted");
+  assert.equal(body.application.fullName, "Elena Díaz");
+  assert.equal(body.application.docsLicenseProof, "missing");
 
   const catalog = await handleProvidersFetch(new Request("http://localhost/api/providers/catalog"));
   const catalogBody = await catalog.json() as {mockFallback: boolean; providers: unknown[]};
@@ -139,7 +174,7 @@ test("provider apply API persists without Auth or Stripe secrets", async () => {
   assert.equal(catalogBody.mockFallback, true);
   assert.equal(catalogBody.providers.length, 0);
 
-  const listed = await handleProvidersFetch(new Request("http://localhost/api/providers/applications"));
+  const listed = await handleProvidersFetch(new Request("http://localhost/api/providers/applications?neighborhood=Brickell"));
   assert.equal(listed.status, 200);
   const listBody = await listed.json() as {applications: Array<{email: string}>; opsOpen: boolean};
   assert.equal(listBody.opsOpen, true);
@@ -170,9 +205,10 @@ test("ops secret gates admin list and status", async () => {
   const approved = await handleProvidersFetch(new Request("http://localhost/api/providers/applications/status", {
     method: "POST",
     headers: {"Content-Type": "application/json", "x-salu-ops": "pipeline-key"},
-    body: JSON.stringify({id: created.id, status: "approved"}),
+    body: JSON.stringify({id: created.id, status: "approved", docsLicenseProof: "received"}),
   }), env);
   assert.equal(approved.status, 200);
-  const approvedBody = await approved.json() as {application: {status: string}};
+  const approvedBody = await approved.json() as {application: {status: string; docsLicenseProof: string}};
   assert.equal(approvedBody.application.status, "approved");
+  assert.equal(approvedBody.application.docsLicenseProof, "received");
 });

@@ -45,6 +45,6 @@ You do **not** need live Stripe or Auth secrets to compile, lint, or test.
 
 - Package **remaining-session counts** stay in the browser. A booking can record `packageName` / `packageItem` and skip Credits; the pack inventory is not a D1 entitlement table yet.
 - Provider and admin **calendars** stay prototype / local. Head of BD owns the Miami supplier pipeline (outreach, interviews, status); eng owns persistence and APIs — see [PROVIDERS.md](./PROVIDERS.md).
-- Availability inventory is the Miami catalog (`domain/mock-data.ts`), not a held-slot table. Approved pipeline suppliers can appear in Explore; the mock catalog stays a labeled **demo**.
+- Availability inventory is the Miami catalog (`domain/mock-data.ts`), not a held-slot table. Approved individual providers can appear in Explore; the mock catalog stays a labeled **demo**.
 - Stripe Connect / `ProviderPayout` is still the next payments step ([NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md)).
 - Atlas LLM, Cloudflare DNS cutover, and live credential-verification integrations are unchanged.
