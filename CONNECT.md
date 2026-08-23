@@ -91,6 +91,7 @@ The Worker also `CREATE TABLE IF NOT EXISTS` on first use. Apply the SQL in the 
 
 ```bash
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0005_connect.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0006_credentials.sql
 ```
 
 ## API

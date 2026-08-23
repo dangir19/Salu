@@ -1,6 +1,6 @@
 # Salu authentication
 
-Salu members sign in with **Google** or **Apple**. Sessions are Auth.js JWTs (`@auth/core`) on vinext / Cloudflare Workers. Member rows persist to D1 when the `DB` binding exists.
+Salu members and providers create an account with **email and password**. Google and Apple stay as optional shortcuts when their apps exist. Sessions are Auth.js JWTs (`@auth/core`) on vinext / Cloudflare Workers. Member rows persist to D1 when the `DB` binding exists. Password hashes live in `member_credentials` (same D1 / in-memory honesty pattern as members).
 
 ## Why Auth.js (not Better Auth or Clerk)
 
@@ -13,14 +13,34 @@ Salu members sign in with **Google** or **Apple**. Sessions are Auth.js JWTs (`@
 
 ChatGPT / OpenAI Sites headers (`oai-authenticated-user-*`) still count as a session when present.
 
+## Native email and password
+
+This is the real non-OAuth path in production. No extra env keys. `AUTH_SECRET` still signs the JWT (the repo stub is fine locally).
+
+| Step | Path |
+| --- | --- |
+| Create account | `POST /api/auth/register` with `{ email, password, displayName }` |
+| Sign in | Auth.js Credentials provider `credentials` → `/api/auth/signin/credentials` |
+| Surfaces | `/signin` (members) and `/provider/signin` (providers). Same identity. Role still comes from approved Apply, `SALU_PROVIDER_EMAILS`, or the labeled Tide & Tone demo. |
+
+Safeguards shipped with the MVP:
+
+- Email is trimmed and lowercased.
+- Passwords need at least 8 characters (max 128).
+- Hashes are **PBKDF2-SHA-256** via Web Crypto (`pbkdf2-sha256$210000$salt$hash`). bcrypt / argon2 / Node `scrypt` need native or WASM bindings that are a poor fit for Cloudflare Workers; WebCrypto is what Workers actually accelerate.
+- Login errors stay generic (`We couldn’t sign you in with those details.`). Register does not confirm that an email already exists.
+- In-isolate rate limits on register (6 / 15 min) and login (8 / 15 min) per IP + email. This is best-effort until KV exists.
+
+**Password reset later.** There is no email provider in this repo, so a reset-token mailer would need new secrets. `/signin` says reset is not available yet. A token table can land later without changing `member_credentials`.
+
 ## When Daniel must create the apps
 
-Do this **before the first real member can sign in** on a hosted URL (joinsalu.com, a Cloudflare preview, or OpenAI Sites). You do **not** need these apps to run `pnpm dev`, `pnpm test`, `pnpm lint`, or `pnpm exec tsc --noEmit`.
+You do **not** need Google or Apple to run `pnpm dev`, `pnpm test`, `pnpm lint`, or `pnpm exec tsc --noEmit`, or for a member to sign in with email.
 
-1. **Local walkthrough today** — no Google or Apple app. Use the labeled **Continue with a local preview** control (development only).
+1. **Local walkthrough today** — create an email account on `/signin`, or use the labeled **Continue with a local preview** control (development only).
 2. **Google on localhost or production** — create the Google Cloud OAuth client *before* anyone clicks Continue with Google.
 3. **Apple** — create the Apple Services ID *before* anyone clicks Continue with Apple. Apple rejects `http://` and `localhost`; use an `https://` host (production or a tunnel).
-4. **Hosted deploy** — set the env keys on Cloudflare / OpenAI hosting *before* turning off the development bypass (it is already off when `NODE_ENV=production`).
+4. **Hosted deploy** — set `AUTH_SECRET` (and optional Google / Apple keys) on Cloudflare / OpenAI hosting. Production builds never show the development bypass. Email/password is the live non-OAuth path.
 
 ## Environment keys
 
@@ -35,7 +55,7 @@ Do this **before the first real member can sign in** on a hosted URL (joinsalu.c
 | `AUTH_APPLE_TEAM_ID` | Apple (alt) | 10-character Team ID. |
 | `AUTH_APPLE_KEY_ID` | Apple (alt) | Key ID for the `.p8` Sign in with Apple key. |
 | `AUTH_APPLE_PRIVATE_KEY` | Apple (alt) | Full `.p8` body. Use `\n` for newlines in env vars. |
-| `SALU_PROVIDER_EMAILS` | Provider workspace | Optional comma-separated Google/Apple emails that open `/provider` as Tide & Tone until an approved Apply row exists. See [PROVIDER.md](./PROVIDER.md). |
+| `SALU_PROVIDER_EMAILS` | Provider workspace | Optional comma-separated emails (native, Google, or Apple) that open `/provider` as Tide & Tone until an approved Apply row exists. See [PROVIDER.md](./PROVIDER.md). |
 
 Copy `.env.example` to `.env` for Vite, or `.dev.vars` for Wrangler.
 
@@ -101,22 +121,32 @@ Use the `workers.dev` origin for `AUTH_URL` until [CUTOVER.md](./CUTOVER.md). Af
 - `https://joinsalu.com/signin`
 - `https://joinsalu.com/api/auth/csrf` returns JSON
 - Google/Apple callbacks are exactly `/api/auth/callback/google` and `/api/auth/callback/apple`
+- Email/password create + sign-in works without Google or Apple keys
+
+Until Google / Apple keys exist, `/signin` still renders; those buttons stay labeled as unconfigured. Email/password is the live non-OAuth path.
 
 ## Development bypass
 
-Shown only when `NODE_ENV` is not `production`. Labeled **Development only · labeled bypass · not a live membership**. Production builds never register that provider.
+Shown only when `NODE_ENV` is not `production`. Labeled **Development only · labeled bypass · not a live membership**. Production builds never register that provider. Native email/password stays registered in production.
 
 ## Routes
 
 | Path | Role |
 | --- | --- |
-| `/signin` | Hospitality member sign-in |
+| `/signin` | Hospitality member sign-in / create account |
 | `/provider/signin` | Provider sign-in (same Auth.js; demo Tide & Tone in development) |
-| `/api/auth/*` | Auth.js (signin, callback, signout, csrf, session) |
+| `/api/auth/register` | Native account create (JSON). Then the client signs in through Auth.js. |
+| `/api/auth/*` | Auth.js (signin, callback, signout, csrf, session) including `credentials` |
 | `/api/me` | Combined member + provider session (Auth.js JWT + ChatGPT headers + provider flags) |
 
 Logged-out visitors hitting the member shell (`/`, `/atlas`, `/explore`, …) see `/signin` first. Apply, provider workspace, and admin stay public. `/provider` shows the labeled demo plus application lookup until a provider session exists. Admin status writes are open unless `SALU_OPS_SECRET` is set. See [PROVIDERS.md](./PROVIDERS.md) and [PROVIDER.md](./PROVIDER.md).
 
 ## Member storage
 
-`domain/types.ts` `Member` is the contract. `db/schema.ts` maps it onto D1 (`members`, `member_accounts`). `auth/members.ts` upserts to D1 when `env.DB` is bound, otherwise an in-process store so tests and secret-less builds still run.
+`domain/types.ts` `Member` is the contract. `db/schema.ts` maps it onto D1 (`members`, `member_accounts`, `member_credentials`). `auth/members.ts` and `auth/credentials.ts` upsert to D1 when `env.DB` is bound, otherwise an in-process store so tests and secret-less builds still run.
+
+```bash
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0006_credentials.sql
+```
+
+The Worker also `CREATE TABLE IF NOT EXISTS member_credentials` on first use.

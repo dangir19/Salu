@@ -5,8 +5,8 @@ Independent Miami providers can sign in to a workspace that is **distinct from m
 ## What Daniel can do today
 
 1. Open **`/provider/signin`** (or **Provider workspace** in the footer).
-2. In development, **Continue as Tide & Tone** — labeled demo provider, no Google app required.
-3. After approval, the same Auth.js Google / Apple account opens this workspace with `role=provider`.
+2. Create or sign in with **email and password**, or in development **Continue as Tide & Tone** — labeled demo provider, no Google app required.
+3. After approval, the same Auth.js email / Google / Apple account opens this workspace with `role=provider`.
 4. Incoming member bookings for that practice appear in the in-app queue (polls every few seconds).
 5. **Accept**, **decline**, or **propose a new time**.
 6. On **Schedule**, see accepted jobs, **mark complete**, and **block off** a time.
@@ -18,14 +18,14 @@ You do **not** need live Stripe, live OAuth, or D1 to compile, lint, or test. Wi
 
 | Path | Who |
 | --- | --- |
-| `/signin` | Members (Google, Apple, local preview) |
+| `/signin` | Members (email/password, optional Google / Apple, local preview) |
 | `/provider/signin` | Providers (same Auth.js; callback `/provider`) |
 
 Sessions are Auth.js JWTs. `/api/me` returns `{ member, provider, providers }`. `provider` is present only when the email is a demo practice, an allowlisted provider, or (after the recruitment PR) an **approved** application.
 
 | Key | Required for | Notes |
 | --- | --- | --- |
-| `SALU_PROVIDER_EMAILS` | Production Google/Apple providers | Comma-separated emails that should get `role=provider` and Tide & Tone coverage when they are not already an approved Apply person. |
+| `SALU_PROVIDER_EMAILS` | Production providers | Comma-separated emails (native, Google, or Apple) that should get `role=provider` and Tide & Tone coverage when they are not already an approved Apply person. |
 
 Demo emails `tide@localhost` and `provider@localhost` always resolve to **Tide & Tone Recovery** (`practice_id` `tide-tone`). Production builds never show **Continue as Tide & Tone**.
 
@@ -71,6 +71,7 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0003_provider_applications.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0004_provider_workspace.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0005_connect.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0006_credentials.sql
 ```
 
 Apply / BD review is in [PROVIDERS.md](./PROVIDERS.md) (`0003_provider_applications.sql`). `0004_provider_workspace.sql` adds `provider_accounts`, `appointment_requests`, `provider_assignments`, and `provider_blocks`. Connect tables are in `0005_connect.sql` — see [CONNECT.md](./CONNECT.md). The Worker also `CREATE TABLE IF NOT EXISTS` on first use. Without `DB`, the same APIs use an in-process store (lost on Worker restart).

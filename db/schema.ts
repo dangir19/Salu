@@ -15,6 +15,14 @@ export const members = sqliteTable("members", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const memberCredentials = sqliteTable("member_credentials", {
+  email: text("email").primaryKey(),
+  memberId: text("member_id").notNull(),
+  passwordHash: text("password_hash").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 export const memberAccounts = sqliteTable(
   "member_accounts",
   {

@@ -50,6 +50,21 @@ test("registers Google, Apple and a development-only bypass", () => {
   assert.match(signIn, /Development only/);
 });
 
+test("ships native email and password as the primary Auth.js path", () => {
+  assert.match(config, /id: "credentials"/);
+  assert.match(config, /verifyNativeLogin/);
+  assert.match(schema, /sqliteTable\("member_credentials"/);
+  assert.match(signIn, /Sign in with email/);
+  assert.match(signIn, /Create account/);
+  assert.match(signIn, /\/api\/auth\/register/);
+  assert.match(signIn, /Forgot your password/);
+  assert.match(authMd, /Native email and password/);
+  assert.match(authMd, /PBKDF2-SHA-256/);
+  assert.match(authMd, /Password reset later/);
+  assert.match(authMd, /\/api\/auth\/register/);
+  assert.match(example, /Native email\/password accounts need no extra keys/);
+});
+
 test("maps sessions onto the Member domain contract and D1 tables", () => {
   assert.match(types, /export type Member=\{id:ID;email:string;displayName:string/);
   assert.match(types, /authProvider\?:AuthProvider/);

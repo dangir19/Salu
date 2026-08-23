@@ -1,5 +1,5 @@
 export type ID = string;
-export type AuthProvider = "google"|"apple"|"chatgpt"|"development";
+export type AuthProvider = "google"|"apple"|"chatgpt"|"development"|"credentials";
 export type MembershipStatus = "none"|"incomplete"|"active"|"past_due"|"canceled"|"trialing";
 export type PlanName = "Member"|"Gold"|"Platinum";
 export type Member={id:ID;email:string;displayName:string;householdId?:ID;planId:ID;authProvider?:AuthProvider;image?:string;createdAt?:string;stripeCustomerId?:string;stripeSubscriptionId?:string;membershipStatus?:MembershipStatus};

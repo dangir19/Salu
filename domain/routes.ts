@@ -83,9 +83,9 @@ export const pageDescriptions: Record<Page,string>={
  onboard:"Join Salu and start a demo membership with Credits ready to use.",
  "provider-apply":"Apply as a named independent provider — LMT or other solo licensed person — in Miami.",
  provider:"Accept appointment requests, set up Stripe Connect payouts, and look up your Apply status.",
- "provider-signin":"Continue as a Salu provider to fill member appointment requests.",
+ "provider-signin":"Sign in with email, or continue with Google or Apple, to fill member appointment requests.",
  admin:"Miami review queue for named providers, plus a labeled demo operating view of funds and volume.",
- signin:"Continue with Google or Apple to open your Salu membership.",
+ signin:"Sign in with email, or continue with Google or Apple, to open your Salu membership.",
 };
 
 export const publicPages: Page[] = ["signin","provider-apply","provider","provider-signin","admin"];

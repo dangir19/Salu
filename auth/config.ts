@@ -3,6 +3,7 @@ import Apple from "@auth/core/providers/apple";
 import Credentials from "@auth/core/providers/credentials";
 import Google from "@auth/core/providers/google";
 import {appleClientSecret} from "./apple";
+import {verifyNativeLogin} from "./credentials";
 import {applyAuthEnvToProcess, authSurface, type AuthEnv} from "./env";
 import {memberFromIdentity} from "./identity";
 import {upsertMemberRecord} from "./members";
@@ -18,6 +19,29 @@ export async function createAuthConfig(env: AuthEnv): Promise<AuthConfig> {
   const appleSecret = (await appleClientSecret(env)) || UNSET_APPLE_SECRET;
 
   const providers: AuthConfig["providers"] = [
+    Credentials({
+      id: "credentials",
+      name: "Email",
+      credentials: {
+        email: {label: "Email", type: "email"},
+        password: {label: "Password", type: "password"},
+      },
+      authorize: async (credentials, request) => {
+        const email = typeof credentials?.email === "string" ? credentials.email : "";
+        const password = typeof credentials?.password === "string" ? credentials.password : "";
+        const ip =
+          request?.headers?.get("cf-connecting-ip") ||
+          request?.headers?.get("x-forwarded-for");
+        const member = await verifyNativeLogin(email, password, ip);
+        if (!member) return null;
+        return {
+          id: member.id,
+          name: member.displayName,
+          email: member.email,
+          image: member.image,
+        };
+      },
+    }),
     Google({
       clientId: env.AUTH_GOOGLE_ID || UNSET_GOOGLE_ID,
       clientSecret: env.AUTH_GOOGLE_SECRET || UNSET_GOOGLE_SECRET,

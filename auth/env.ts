@@ -1,6 +1,6 @@
 export const DEV_AUTH_SECRET = "salu-dev-auth-secret-not-for-production-32b";
 
-export type AuthProviderId = "google" | "apple" | "chatgpt" | "development";
+export type AuthProviderId = "google" | "apple" | "chatgpt" | "development" | "credentials";
 
 export type AuthEnv = {
   AUTH_SECRET: string;
