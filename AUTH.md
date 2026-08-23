@@ -38,9 +38,8 @@ Safeguards shipped with the MVP:
 You do **not** need Google or Apple to run `pnpm dev`, `pnpm test`, `pnpm lint`, or `pnpm exec tsc --noEmit`, or for a member to sign in with email.
 
 1. **Local walkthrough today** — create an email account on `/signin`, or use the labeled **Continue with a local preview** control (development only).
-2. **Google on localhost or production** — create the Google Cloud OAuth client *before* anyone clicks Continue with Google.
-3. **Apple** — create the Apple Services ID *before* anyone clicks Continue with Apple. Apple rejects `http://` and `localhost`; use an `https://` host (production or a tunnel).
-4. **Hosted deploy** — set `AUTH_SECRET` (and optional Google / Apple keys) on Cloudflare / OpenAI hosting. Production builds never show the development bypass. Email/password is the live non-OAuth path.
+2. **Google / Apple are deferred.** The buttons stay on the sign-in screen as optional shortcuts and say **coming soon** until keys exist. You do not need to configure OAuth to ship email/password.
+3. **Hosted deploy** — set `AUTH_SECRET` on Cloudflare / OpenAI hosting. Production builds never show the development bypass. Email/password is the live sign-in path. Add Google / Apple keys later if you want those shortcuts.
 
 ## Environment keys
 

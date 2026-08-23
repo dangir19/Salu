@@ -249,12 +249,12 @@ function OAuthButtons({
           start(
             "google",
             surface.google,
-            "Google sign-in is not configured on this deployment. Add AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET — see AUTH.md.",
+            "Google is coming soon on this deployment. Use email for now — AUTH.md has the optional OAuth keys when you want the shortcut.",
           )
         }
       >
         <GoogleMark />
-        {busy === "google" ? "Opening Google…" : "Continue with Google"}
+        {busy === "google" ? "Opening Google…" : surface.google ? "Continue with Google" : "Continue with Google · coming soon"}
       </button>
       <button
         type="button"
@@ -264,12 +264,12 @@ function OAuthButtons({
           start(
             "apple",
             surface.apple,
-            "Apple sign-in is not configured on this deployment. Add your Services ID and key — see AUTH.md.",
+            "Apple is coming soon on this deployment. Use email for now — AUTH.md has the optional Services ID steps when you want the shortcut.",
           )
         }
       >
         <AppleMark />
-        {busy === "apple" ? "Opening Apple…" : "Continue with Apple"}
+        {busy === "apple" ? "Opening Apple…" : surface.apple ? "Continue with Apple" : "Continue with Apple · coming soon"}
       </button>
       {surface.development && kind === "member" && (
         <button

@@ -47,6 +47,7 @@ test("registers Google, Apple and a development-only bypass", () => {
   assert.match(envFile, /nodeEnv === "production"/);
   assert.match(signIn, /Continue with Google/);
   assert.match(signIn, /Continue with Apple/);
+  assert.match(signIn, /coming soon/);
   assert.match(signIn, /Development only/);
 });
 
