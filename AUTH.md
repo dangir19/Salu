@@ -21,7 +21,7 @@ This is the real non-OAuth path in production. No extra env keys. `AUTH_SECRET` 
 | --- | --- |
 | Create account | `POST /api/auth/register` with `{ email, password, displayName }` |
 | Sign in | Auth.js Credentials provider `credentials` → `/api/auth/signin/credentials` |
-| Surfaces | `/signin` (members) and `/provider/signin` (providers). Same identity. Role still comes from approved Apply, `SALU_PROVIDER_EMAILS`, or the labeled Tide & Tone demo. |
+| Surfaces | Member **popup** over the browsable shell (`/signin` is a deep link) and `/provider/signin`. Same identity. Role still comes from approved Apply, `SALU_PROVIDER_EMAILS`, or the labeled Tide & Tone demo. |
 
 Safeguards shipped with the MVP:
 
