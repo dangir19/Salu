@@ -4,17 +4,26 @@ import {resetMemberMemory} from "../auth/members.ts";
 import {handleBookingsFetch} from "../bookings/handlers.ts";
 import {creditsForService} from "../bookings/catalog.ts";
 import {
+  acceptProposedBookingTime,
   BookingError,
   cancelMemberBooking,
   createMemberBooking,
+  declineProposedBookingTime,
   InsufficientCreditsError,
   listMemberBookings,
   rescheduleMemberBooking,
   resetBookingMemory,
   toUiBooking,
 } from "../bookings/service.ts";
-import {applyCreditEntry, rememberMember, resetPaymentMemory} from "../payments/ledger.ts";
-import {resetProviderWorkspaceMemory} from "../provider/service.ts";
+import {applyCreditEntry, getMemberBilling, rememberMember, resetPaymentMemory} from "../payments/ledger.ts";
+import {
+  listInboxForProvider,
+  listJobsForProvider,
+  proposeRequestTime,
+  requestForBooking,
+  resetProviderWorkspaceMemory,
+  resolveProviderAccount,
+} from "../provider/service.ts";
 import type {Member} from "../domain/types.ts";
 
 async function seedMember(id = "member_ava"): Promise<Member> {
@@ -191,6 +200,149 @@ test("does not let one member cancel another member's reservation", async () => 
   assert.equal((await listMemberBookings(owner.id))[0]?.status, "confirmed");
 });
 
+test("member can accept a proposed time without moving Credits", async () => {
+  const member = await seedMember();
+  await fund(member, 200);
+  const provider = await resolveProviderAccount({
+    email: "tide@localhost",
+    displayName: "Sofia Alvarez",
+    memberId: "provider_tide_tone",
+  });
+  assert.ok(provider);
+
+  const created = await createMemberBooking({
+    member,
+    serviceId: "deep-tissue",
+    date: "Tomorrow · 6:00 PM",
+    mode: "At home · Brickell",
+    enforceCredits: true,
+  });
+  const opened = await requestForBooking(created.booking.id);
+  assert.ok(opened);
+  await proposeRequestTime({provider, requestId: opened.id, date: "Friday · 8:00 PM"});
+  const before = await getMemberBilling(member);
+
+  const accepted = await acceptProposedBookingTime({member, bookingId: created.booking.id});
+  const after = await getMemberBilling(member);
+  const request = await requestForBooking(created.booking.id);
+  const memberView = (await listMemberBookings(member.id))[0];
+
+  assert.equal(accepted.creditsApplied, false);
+  assert.equal(accepted.availableCredits, before.wallet.availableCredits);
+  assert.equal(after.wallet.availableCredits, before.wallet.availableCredits);
+  assert.equal(accepted.booking.date, "Friday · 8:00 PM");
+  assert.equal(accepted.booking.assignment, "accepted");
+  assert.equal(accepted.booking.creditsCharged, created.booking.creditsCharged);
+  assert.equal(request?.status, "accepted");
+  assert.equal(request?.date, "Friday · 8:00 PM");
+  assert.equal(request?.assignedProviderId, provider.id);
+  assert.equal(request?.proposedDate, undefined);
+  assert.equal(memberView?.assignment, "accepted");
+  assert.equal(memberView?.date, "Friday · 8:00 PM");
+  assert.equal((await listJobsForProvider(provider)).some((row) => row.id === opened.id), true);
+  assert.equal((await listInboxForProvider(provider)).some((row) => row.id === opened.id), false);
+});
+
+test("member can decline a proposed time and the request reopens without refunding Credits", async () => {
+  const member = await seedMember();
+  await fund(member, 200);
+  const provider = await resolveProviderAccount({
+    email: "tide@localhost",
+    displayName: "Sofia Alvarez",
+    memberId: "provider_tide_tone",
+  });
+  assert.ok(provider);
+
+  const created = await createMemberBooking({
+    member,
+    serviceId: "sports-massage",
+    date: "Tomorrow · 7:30 PM",
+    mode: "At home · Miami Beach",
+    enforceCredits: true,
+  });
+  const opened = await requestForBooking(created.booking.id);
+  assert.ok(opened);
+  await proposeRequestTime({provider, requestId: opened.id, date: "Friday · 8:00 PM"});
+  const before = await getMemberBilling(member);
+
+  const declined = await declineProposedBookingTime({member, bookingId: created.booking.id});
+  const after = await getMemberBilling(member);
+  const request = await requestForBooking(created.booking.id);
+  const memberView = (await listMemberBookings(member.id))[0];
+
+  assert.equal(declined.creditsApplied, false);
+  assert.equal(declined.availableCredits, before.wallet.availableCredits);
+  assert.equal(after.wallet.availableCredits, before.wallet.availableCredits);
+  assert.equal(declined.booking.date, "Tomorrow · 7:30 PM");
+  assert.equal(declined.booking.assignment, "unassigned");
+  assert.equal(request?.status, "open");
+  assert.equal(request?.date, "Tomorrow · 7:30 PM");
+  assert.equal(request?.assignedProviderId, undefined);
+  assert.equal(request?.proposedDate, undefined);
+  assert.equal(memberView?.assignment, "unassigned");
+  assert.equal(memberView?.proposedDate, undefined);
+  assert.equal((await listInboxForProvider(provider)).some((row) => row.id === opened.id), true);
+});
+
+test("rejects accept and decline when the provider has not proposed a time", async () => {
+  const member = await seedMember();
+  await fund(member, 200);
+  const created = await createMemberBooking({
+    member,
+    serviceId: "deep-tissue",
+    date: "Tomorrow · 6:00 PM",
+    mode: "At home · Brickell",
+    enforceCredits: true,
+  });
+
+  await assert.rejects(
+    () => acceptProposedBookingTime({member, bookingId: created.booking.id}),
+    (error: unknown) => error instanceof BookingError && /no proposed time/i.test(error.message),
+  );
+  await assert.rejects(
+    () => declineProposedBookingTime({member, bookingId: created.booking.id}),
+    (error: unknown) => error instanceof BookingError && /no proposed time/i.test(error.message),
+  );
+});
+
+test("does not let a member accept or decline another member's proposed time", async () => {
+  const owner = await seedMember("member_ava");
+  await fund(owner, 200);
+  const provider = await resolveProviderAccount({
+    email: "tide@localhost",
+    displayName: "Sofia Alvarez",
+    memberId: "provider_tide_tone",
+  });
+  assert.ok(provider);
+  const created = await createMemberBooking({
+    member: owner,
+    serviceId: "lymphatic-massage",
+    date: "Thursday · 3:00 PM",
+    mode: "At home",
+    enforceCredits: true,
+  });
+  const opened = await requestForBooking(created.booking.id);
+  assert.ok(opened);
+  await proposeRequestTime({provider, requestId: opened.id, date: "Friday · 4:00 PM"});
+
+  const other = await rememberMember({
+    id: "member_other",
+    email: "other@joinsalu.com",
+    displayName: "Other Member",
+    planId: "member",
+  });
+
+  await assert.rejects(
+    () => acceptProposedBookingTime({member: other, bookingId: created.booking.id}),
+    (error: unknown) => error instanceof BookingError && error.status === 404,
+  );
+  await assert.rejects(
+    () => declineProposedBookingTime({member: other, bookingId: created.booking.id}),
+    (error: unknown) => error instanceof BookingError && error.status === 404,
+  );
+  assert.equal((await requestForBooking(created.booking.id))?.status, "proposed");
+});
+
 test("booking API stays demo without a member session and does not need Stripe secrets", async () => {
   const listed = await handleBookingsFetch(new Request("http://localhost/api/bookings"));
   assert.equal(listed.status, 200);
@@ -208,4 +360,20 @@ test("booking API stays demo without a member session and does not need Stripe s
   assert.equal(created.status, 401);
   const body = await created.json() as {source: string};
   assert.equal(body.source, "demo");
+
+  const accepted = await handleBookingsFetch(new Request("http://localhost/api/bookings/accept-proposal", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id: "b_missing"}),
+  }));
+  assert.equal(accepted.status, 401);
+  assert.equal(((await accepted.json()) as {source: string}).source, "demo");
+
+  const declined = await handleBookingsFetch(new Request("http://localhost/api/bookings/decline-proposal", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({id: "b_missing"}),
+  }));
+  assert.equal(declined.status, 401);
+  assert.equal(((await declined.json()) as {source: string}).source, "demo");
 });

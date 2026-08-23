@@ -455,7 +455,7 @@ export default function ProviderWorkspace({
                   <p>{request.memberDisplayName} · {request.mode}</p>
                   {request.note && <p className="request-note">{request.note}</p>}
                   {request.status === "proposed" && request.proposedDate && (
-                    <p className="request-note">You proposed {request.proposedDate}. Waiting on the member calendar.</p>
+                    <p className="request-note">You proposed {request.proposedDate}. Waiting for the member to accept or decline from Appointments.</p>
                   )}
                 </div>
                 <div className="request-actions">

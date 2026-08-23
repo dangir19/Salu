@@ -124,13 +124,32 @@ async function persistRequest(request: AppointmentRequest): Promise<void> {
     await db.ensureProviderWorkspaceSchema();
     const existing = await db.getAppointmentRequestById(request.id);
     if (existing) {
-      await db.updateAppointmentRequest(request.id, request);
+      await db.updateAppointmentRequest(request.id, {
+        ...request,
+        assignedProviderId: request.assignedProviderId ?? "",
+        proposedDate: request.proposedDate ?? "",
+        note: request.note ?? existing.note ?? "",
+      });
     } else {
       await db.insertAppointmentRequest(request);
     }
   } catch {
     // D1 is optional.
   }
+}
+
+async function storedAccountById(id: string): Promise<ProviderAccount | null> {
+  const remembered = accountMemory.get(id);
+  if (remembered) return remembered;
+  try {
+    const db = await import("../db/provider");
+    await db.ensureProviderWorkspaceSchema();
+    const persisted = await db.getProviderAccountById(id);
+    if (persisted) return rememberAccount(persisted);
+  } catch {
+    // Fall through to memory.
+  }
+  return null;
 }
 
 async function storedRequest(id: string): Promise<AppointmentRequest | null> {
@@ -453,6 +472,77 @@ export async function declineRequest(input: {
     status: "declined",
     createdAt: now,
   });
+  return next;
+}
+
+export async function acceptProposedTimeForMember(input: {
+  memberId: string;
+  bookingId: string;
+}): Promise<AppointmentRequest> {
+  const request = await storedRequestByBooking(input.bookingId);
+  if (!request || request.memberId !== input.memberId) {
+    throw new ProviderError("That reservation is not on your calendar.", 404);
+  }
+  if (request.status === "cancelled") throw new ProviderError("That reservation was cancelled.");
+  if (request.status !== "proposed" || !request.proposedDate) {
+    throw new ProviderError("There is no proposed time waiting on this reservation.");
+  }
+
+  const provider = request.assignedProviderId ? await storedAccountById(request.assignedProviderId) : null;
+  const blocks = provider ? await listStoredBlocks(provider.id) : [];
+  if (blocks.some((block) => block.date === request.proposedDate)) {
+    throw new ProviderError("That proposed time is no longer open on the provider calendar.");
+  }
+
+  const now = new Date().toISOString();
+  const next: AppointmentRequest = {
+    ...request,
+    date: request.proposedDate,
+    status: "accepted",
+    assignedProviderId: request.assignedProviderId,
+    proposedDate: undefined,
+    updatedAt: now,
+  };
+  await persistRequest(next);
+  if (provider) {
+    await persistAssignment({
+      id: `asg_${crypto.randomUUID()}`,
+      requestId: request.id,
+      bookingId: request.bookingId,
+      providerId: provider.id,
+      practiceId: provider.practiceId,
+      status: "accepted",
+      createdAt: now,
+    });
+  }
+  return next;
+}
+
+export async function declineProposedTimeForMember(input: {
+  memberId: string;
+  bookingId: string;
+}): Promise<AppointmentRequest> {
+  const request = await storedRequestByBooking(input.bookingId);
+  if (!request || request.memberId !== input.memberId) {
+    throw new ProviderError("That reservation is not on your calendar.", 404);
+  }
+  if (request.status === "cancelled") throw new ProviderError("That reservation was cancelled.");
+  if (request.status !== "proposed") {
+    throw new ProviderError("There is no proposed time waiting on this reservation.");
+  }
+
+  const now = new Date().toISOString();
+  const next: AppointmentRequest = {
+    ...request,
+    status: "open",
+    assignedProviderId: undefined,
+    proposedDate: undefined,
+    note: request.walkthrough
+      ? request.note
+      : "Member declined the proposed time. The original time is still waiting.",
+    updatedAt: now,
+  };
+  await persistRequest(next);
   return next;
 }
 
