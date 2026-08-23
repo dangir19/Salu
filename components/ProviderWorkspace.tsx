@@ -284,14 +284,23 @@ export default function ProviderWorkspace({
     refresh();
     const params = new URLSearchParams(window.location.search);
     const returned = params.get("connect");
-    if (returned === "return") setToast("Returned from Stripe. Payouts enable after account.updated — usually instantly.");
-    if (returned === "refresh") setToast("Stripe needs you to restart payout setup.");
+    const returnedMessage = returned === "return"
+      ? "Returned from Stripe. Payouts enable after account.updated — usually instantly."
+      : returned === "refresh"
+        ? "Stripe needs you to restart payout setup."
+        : "";
     if (returned) {
       params.delete("connect");
       window.history.replaceState({}, "", `${window.location.pathname}${params.toString() ? `?${params}` : ""}`);
     }
+    const toastTimer = returnedMessage
+      ? window.setTimeout(() => setToast(returnedMessage), 0)
+      : 0;
     const timer = window.setInterval(refresh, 4000);
-    return () => window.clearInterval(timer);
+    return () => {
+      if (toastTimer) window.clearTimeout(toastTimer);
+      window.clearInterval(timer);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh closes over the latest setters.
   }, [provider]);
 
