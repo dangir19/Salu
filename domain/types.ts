@@ -1,5 +1,8 @@
 export type ID = string;
-export type Member={id:ID;email:string;displayName:string;householdId?:ID;planId:ID};
+export type AuthProvider = "google"|"apple"|"chatgpt"|"development";
+export type Member={id:ID;email:string;displayName:string;householdId?:ID;planId:ID;authProvider?:AuthProvider;image?:string;createdAt?:string};
+export type PaymentMethod={brand:string;last4:string;expMonth:number;expYear:number};
+export type PaymentsPort={getDefaultPaymentMethod(memberId:ID):Promise<PaymentMethod|null>};
 export type Household={id:ID;name:string;memberIds:ID[];walletId:ID};
 export type MembershipPlan={id:ID;name:"Member"|"Gold"|"Platinum";monthlyContribution:number;discountPercent:0|10|20;creditsRollOver:boolean;householdSlots:number};
 export type Wallet={id:ID;householdId:ID;availableCredits:number};

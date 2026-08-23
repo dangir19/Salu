@@ -14,6 +14,17 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  vars: {
+    AUTH_SECRET: process.env.AUTH_SECRET ?? "salu-dev-auth-secret-not-for-production-32b",
+    AUTH_URL: process.env.AUTH_URL ?? "",
+    AUTH_GOOGLE_ID: process.env.AUTH_GOOGLE_ID ?? process.env.GOOGLE_CLIENT_ID ?? "",
+    AUTH_GOOGLE_SECRET: process.env.AUTH_GOOGLE_SECRET ?? process.env.GOOGLE_CLIENT_SECRET ?? "",
+    AUTH_APPLE_ID: process.env.AUTH_APPLE_ID ?? process.env.APPLE_CLIENT_ID ?? "",
+    AUTH_APPLE_SECRET: process.env.AUTH_APPLE_SECRET ?? process.env.APPLE_CLIENT_SECRET ?? "",
+    AUTH_APPLE_TEAM_ID: process.env.AUTH_APPLE_TEAM_ID ?? "",
+    AUTH_APPLE_KEY_ID: process.env.AUTH_APPLE_KEY_ID ?? "",
+    AUTH_APPLE_PRIVATE_KEY: process.env.AUTH_APPLE_PRIVATE_KEY ?? "",
+  },
   d1_databases: d1
     ? [
         {

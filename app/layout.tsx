@@ -9,6 +9,7 @@ import "./audit2.css";
 import "./network.css";
 import "./membership.css";
 import "./about.css";
+import "./auth.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

@@ -5,6 +5,15 @@ import handler from "vinext/server/app-router-entry";
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  AUTH_SECRET?: string;
+  AUTH_URL?: string;
+  AUTH_GOOGLE_ID?: string;
+  AUTH_GOOGLE_SECRET?: string;
+  AUTH_APPLE_ID?: string;
+  AUTH_APPLE_SECRET?: string;
+  AUTH_APPLE_TEAM_ID?: string;
+  AUTH_APPLE_KEY_ID?: string;
+  AUTH_APPLE_PRIVATE_KEY?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -28,6 +37,11 @@ interface ExecutionContext {
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/api/me" || url.pathname.startsWith("/api/auth")) {
+      const {handleAuthFetch} = await import("../auth/handlers");
+      return handleAuthFetch(request, env as unknown as Record<string, string | undefined>);
+    }
 
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];

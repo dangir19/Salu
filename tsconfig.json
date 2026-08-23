@@ -23,7 +23,8 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "types/**/*.d.ts"
   ],
-  "exclude": ["node_modules", "db", "worker", "examples"]
+  "exclude": ["node_modules", "worker", "examples", "tests"]
 }

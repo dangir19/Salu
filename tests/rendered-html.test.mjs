@@ -4,6 +4,7 @@ import {readFile} from "node:fs/promises";
 const app=await readFile(new URL("../components/SaluApp.tsx",import.meta.url),"utf8");
 const data=await readFile(new URL("../domain/mock-data.ts",import.meta.url),"utf8");
 const types=await readFile(new URL("../domain/types.ts",import.meta.url),"utf8");
+const payments=await readFile(new URL("../domain/payments.ts",import.meta.url),"utf8");
 const css=await readFile(new URL("../app/globals.css",import.meta.url),"utf8");
 const networkCss=await readFile(new URL("../app/network.css",import.meta.url),"utf8");
 const membershipCss=await readFile(new URL("../app/membership.css",import.meta.url),"utf8");
@@ -172,7 +173,8 @@ test("keeps a single-member profile and adds About after plans",()=>{
  assert.doesNotMatch(app,/health best friend|best friend\./i);
  assert.doesNotMatch(app,/getting back in a car after a massage/);
  assert.doesNotMatch(app,/OUR ROLE|Hospitality and coordination|about-boundary/);
- for(const term of ["eyebrow=\"PROFILE\" title={displayName}","Salu snapshot and account preferences","Brickell, Miami","1451 Brickell Avenue","MEMBER SINCE","August 2026","Sports Recovery · Relaxation","ACTIVITIES","Running · Biking","BILLING","Visa •••• 4242","Card on file · Expires 08/29","Demo card only"]){assert.match(app,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
+ for(const term of ["eyebrow=\"PROFILE\" title={displayName}","Your Salu membership","Brickell, Miami","1451 Brickell Avenue","MEMBER SINCE","Sports Recovery · Relaxation","ACTIVITIES","Running · Biking","BILLING","No payment method on file","Stripe Billing is not connected yet","PAYMENT_PLACEHOLDER"]){assert.match(app+payments,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
+ assert.doesNotMatch(app,/Visa •••• 4242|Card on file · Expires 08\/29|simulated demo account/);
  for(const term of ["profile-preference-card","preference-edit","beginEdit","savePreference","setPreferences","Edit ${item.label.toLowerCase()}","Cancel","Save"]){assert.match(app,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
  assert.doesNotMatch(app,/Create demo invite|ONE SPOT OPEN|Add a profile|Household profiles|>Household<|PREFERRED SETTING/);
 });
@@ -181,7 +183,7 @@ test("uses joinsalu.com metadata and a branded social preview",()=>{
  assert.doesNotMatch(layout,/Your health best friend/);
 });
 test("exposes shareable member routes and a branded unknown-page state",()=>{
- for(const path of ["/atlas","/explore","/appointments","/plans","/about","/credits","/profile","/join","/apply","/provider","/admin"]){assert.match(routes,new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
+ for(const path of ["/atlas","/explore","/appointments","/plans","/about","/credits","/profile","/join","/apply","/provider","/admin","/signin"]){assert.match(routes,new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
  assert.match(app,/history\.pushState/);
  assert.match(app,/popstate/);
  assert.match(app,/pageFromPath/);
@@ -195,8 +197,8 @@ test("uses package sessions before charging Credits and labels demo billing",()=
  assert.match(app,/confirmed using a \$\{pack\.name\} session/);
  assert.match(app,/packageName&&booking\.packageItem/);
  assert.match(app,/setCredits\(v=>v\+booking\.credits\)/);
- assert.match(app,/Demo card only · payment processing is simulated/);
- assert.match(app,/simulated demo account/);
+ assert.match(app,/Stripe Billing is not connected yet/);
+ assert.match(app,/Your Salu membership/);
  assert.match(app,/complete\(name\.trim\(\),home\.trim\(\)\)/);
  assert.match(app,/skip-link/);
  assert.match(app,/modal-dismiss/);
