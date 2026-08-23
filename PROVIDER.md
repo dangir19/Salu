@@ -1,6 +1,6 @@
 # Provider mode
 
-Independent Miami providers can sign in to a workspace that is **distinct from membership**, fill appointment requests in real time, and keep a simple calendar. Stripe Connect / direct deposit is **not** in this release — see [NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md).
+Independent Miami providers can sign in to a workspace that is **distinct from membership**, fill appointment requests in real time, keep a simple calendar, and finish **Stripe Connect** Express from the signed-in home. Direct deposit details are in [CONNECT.md](./CONNECT.md).
 
 ## What Daniel can do today
 
@@ -9,9 +9,10 @@ Independent Miami providers can sign in to a workspace that is **distinct from m
 3. After approval, the same Auth.js Google / Apple account opens this workspace with `role=provider`.
 4. Incoming member bookings for that practice appear in the in-app queue (polls every few seconds).
 5. **Accept**, **decline**, or **propose a new time**.
-6. On **Schedule**, see accepted jobs and **block off** a time.
+6. On **Schedule**, see accepted jobs, **mark complete**, and **block off** a time.
+7. On **Payouts** (and the request-home card), **Set up payouts** — Stripe Connect Express for that `provider_accounts` practice.
 
-You do **not** need Stripe Connect, live OAuth, or D1 to compile, lint, or test. Without a provider session, `/provider` keeps Apply / BD lookup plus the labeled **Tide & Tone fabricated demo**.
+You do **not** need live Stripe, live OAuth, or D1 to compile, lint, or test. Without `STRIPE_SECRET_KEY`, **Set up payouts** stays a labeled **demo**. Without a provider session, `/provider` keeps Apply / BD lookup plus the labeled **Tide & Tone fabricated demo**.
 
 ## Sign-in (distinct from member)
 
@@ -24,7 +25,7 @@ Sessions are Auth.js JWTs. `/api/me` returns `{ member, provider, providers }`. 
 
 | Key | Required for | Notes |
 | --- | --- | --- |
-| `SALU_PROVIDER_EMAILS` | Production Google/Apple providers | Comma-separated emails that should get `role=provider` and Tide & Tone coverage until Connect / a live practice record exists. |
+| `SALU_PROVIDER_EMAILS` | Production Google/Apple providers | Comma-separated emails that should get `role=provider` and Tide & Tone coverage when they are not already an approved Apply person. |
 
 Demo emails `tide@localhost` and `provider@localhost` always resolve to **Tide & Tone Recovery** (`practice_id` `tide-tone`). Production builds never show **Continue as Tide & Tone**.
 
@@ -55,6 +56,9 @@ The Worker intercepts `/api/provider` and `/api/provider/*` only — not `/api/p
 | `GET` | `/api/provider/schedule` | Accepted jobs + blocks. |
 | `POST` | `/api/provider/schedule/block` | Body: `date`, optional `note`. |
 | `POST` | `/api/provider/schedule/unblock` | Body: `id`. |
+| `GET` | `/api/connect/me` | Auto-claims the signed-in practice (`provider_accounts.practice_id`). |
+| `POST` | `/api/connect/onboard` | Express Account Link. Defaults to the provider account practice. |
+| `POST` | `/api/bookings/complete` | Provider who owns that practice can complete an accepted job. |
 
 `GET`/`POST` without a provider session return `{ source: "demo" }` (401 on writes).
 
@@ -66,19 +70,21 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0001_payments.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0003_provider_applications.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0004_provider_workspace.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0005_connect.sql
 ```
 
-Apply / BD review is in [PROVIDERS.md](./PROVIDERS.md) (`0003_provider_applications.sql`). `0004_provider_workspace.sql` adds `provider_accounts`, `appointment_requests`, `provider_assignments`, and `provider_blocks`. The Worker also `CREATE TABLE IF NOT EXISTS` on first use. Without `DB`, the same APIs use an in-process store (lost on Worker restart).
+Apply / BD review is in [PROVIDERS.md](./PROVIDERS.md) (`0003_provider_applications.sql`). `0004_provider_workspace.sql` adds `provider_accounts`, `appointment_requests`, `provider_assignments`, and `provider_blocks`. Connect tables are in `0005_connect.sql` — see [CONNECT.md](./CONNECT.md). The Worker also `CREATE TABLE IF NOT EXISTS` on first use. Without `DB`, the same APIs use an in-process store (lost on Worker restart).
 
-## What works without Connect
+## What works without a live Stripe Connect account
 
 | Works now | Still demo / later |
 | --- | --- |
-| Provider sign-in (demo or approved email) | Stripe Connect onboarding |
-| Live request queue from member bookings | Direct deposit / `ProviderPayout` |
-| Accept / decline / propose time | Held-slot inventory |
-| Accepted-job calendar + block time | Email / SMS notify |
-| Labeled Tide & Tone fallback | Atlas LLM, Cloudflare DNS ([CUTOVER.md](./CUTOVER.md)) |
-| Member appointment assignment labels | Live credential verification |
+| Provider sign-in (demo or approved email) | Live bank payouts until Express is finished |
+| Live request queue from member bookings | Held-slot inventory |
+| Accept / decline / propose time | Email / SMS notify |
+| Accepted-job calendar + block time + mark complete | Atlas LLM extras, Cloudflare DNS ([CUTOVER.md](./CUTOVER.md)) |
+| Labeled Tide & Tone fallback | Live credential verification |
+| Member appointment assignment labels | Full tax / 1099 ops beyond Express |
+| **Set up payouts** on the signed-in home (demo without keys) | |
 
-Commission math on the unsigned-in demo glance is still fabricated. Accepting a request does **not** move money.
+Commission math on the unsigned-in demo glance is still fabricated. Accepting a request does **not** move money. Completing a booking records an estimated `ProviderPayout` until Stripe Connect payouts are enabled.

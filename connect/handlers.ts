@@ -2,6 +2,7 @@ import {getMemberSession} from "../auth/session";
 import {listProviderBookings, toUiBooking} from "../bookings/service";
 import type {ConnectStatus} from "../domain/types";
 import {rememberMember} from "../payments/ledger";
+import {getProviderSession} from "../provider/session";
 import {applyStripeEnvToProcess, paymentsSurface, readStripeEnv, type StripeEnv} from "../payments/env";
 import {catalogPractices} from "./catalog";
 import {
@@ -51,13 +52,13 @@ export async function handleConnectFetch(request: Request, runtimeEnv: RuntimeEn
   const env = stripeEnvFrom(request, runtimeEnv);
 
   if (url.pathname === "/api/connect/me" && request.method === "GET") {
-    return handleConnectMe(request, env);
+    return handleConnectMe(request, env, runtimeEnv);
   }
   if (url.pathname === "/api/connect/claim" && request.method === "POST") {
     return handleClaim(request);
   }
   if (url.pathname === "/api/connect/onboard" && request.method === "POST") {
-    return handleOnboard(request, env);
+    return handleOnboard(request, env, runtimeEnv);
   }
   if (url.pathname === "/api/connect/login" && request.method === "POST") {
     return handleLogin(request, env);
@@ -65,8 +66,9 @@ export async function handleConnectFetch(request: Request, runtimeEnv: RuntimeEn
   return new Response("Not found", {status: 404});
 }
 
-async function handleConnectMe(request: Request, env: StripeEnv): Promise<Response> {
+async function handleConnectMe(request: Request, env: StripeEnv, runtimeEnv: RuntimeEnv): Promise<Response> {
   const session = await getMemberSession(request);
+  const providerSession = await getProviderSession(request, runtimeEnv);
   const surface = paymentsSurface(env);
   const practices = catalogPractices();
   const providers = await listProviders();
@@ -81,12 +83,19 @@ async function handleConnectMe(request: Request, env: StripeEnv): Promise<Respon
       practices,
       payouts: [],
       bookings: [],
-      message: "Sign in to set up Stripe Connect payouts. This local preview still uses labeled demo payouts.",
+      message: "Sign in as a provider to set up Stripe Connect payouts. This local preview still uses labeled demo payouts.",
     });
   }
 
   const member = await rememberMember(session.member);
   let provider = await findProvider({memberId: member.id});
+  if (!provider && providerSession) {
+    provider = await claimProvider({
+      member,
+      providerId: providerSession.provider.practiceId,
+      practiceName: providerSession.provider.practiceName,
+    });
+  }
   if (provider && surface.connect) {
     provider = await refreshProviderAccount({provider, env});
   }
@@ -131,9 +140,10 @@ async function handleClaim(request: Request): Promise<Response> {
   }
 }
 
-async function handleOnboard(request: Request, env: StripeEnv): Promise<Response> {
+async function handleOnboard(request: Request, env: StripeEnv, runtimeEnv: RuntimeEnv): Promise<Response> {
   const member = await requireMember(request);
   if (!member) return json({error: "Sign in to set up payouts."}, 401);
+  const providerSession = await getProviderSession(request, runtimeEnv);
 
   let body: {providerId?: string} = {};
   try {
@@ -147,7 +157,8 @@ async function handleOnboard(request: Request, env: StripeEnv): Promise<Response
   try {
     const result = await startConnectOnboarding({
       member,
-      providerId: body.providerId,
+      providerId: body.providerId || providerSession?.provider.practiceId,
+      practiceName: providerSession?.provider.practiceName,
       origin: new URL(request.url).origin,
       env,
     });

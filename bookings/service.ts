@@ -255,7 +255,23 @@ export async function completeMemberBooking(input: {
   if (!ownsBooking) {
     try {
       const connect = await import("../connect/service");
-      const provider = await connect.findProvider({memberId: input.member.id});
+      let provider = await connect.findProvider({memberId: input.member.id});
+      if (!provider) {
+        const {resolveProviderAccount} = await import("../provider/service");
+        const account = await resolveProviderAccount({
+          id: input.member.id,
+          email: input.member.email,
+          displayName: input.member.displayName,
+          memberId: input.member.id,
+        });
+        if (account && (account.practiceName === booking.provider || account.practiceId === booking.serviceId)) {
+          provider = await connect.claimProvider({
+            member: input.member,
+            providerId: account.practiceId,
+            practiceName: account.practiceName,
+          });
+        }
+      }
       providerOwns = Boolean(provider && provider.name === booking.provider);
     } catch {
       providerOwns = false;

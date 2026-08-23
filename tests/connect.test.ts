@@ -76,6 +76,48 @@ test("maps Express account flags to payout status labels", () => {
   assert.equal(connectStatusLabel("payouts_enabled"), "Payouts enabled");
 });
 
+test("claims a non-catalog practice when the provider account supplies a name", async () => {
+  const member = await seedMember("member_apply");
+  const claimed = await claimProvider({
+    member,
+    providerId: "app_sofia",
+    practiceName: "Sofia Alvarez, LMT",
+  });
+  assert.equal(claimed.id, "app_sofia");
+  assert.equal(claimed.name, "Sofia Alvarez, LMT");
+  assert.equal(claimed.status, "approved");
+  assert.equal(claimed.memberId, member.id);
+  assert.equal(claimed.commissionRate, 20);
+
+  await assert.rejects(
+    () => claimProvider({member, providerId: "unknown-practice"}),
+    (error: unknown) => error instanceof ConnectError,
+  );
+});
+
+test("lets the claimed provider complete another member's booking", async () => {
+  const guest = await seedMember("member_guest");
+  await applyCreditEntry({member: guest, credits: 200, kind: "contribution", label: "Test funding"});
+  const created = await createMemberBooking({
+    member: guest,
+    serviceId: "deep-tissue",
+    date: "Tomorrow · 6:00 PM",
+    mode: "At home",
+    enforceCredits: true,
+  });
+  const providerMember = await rememberMember({
+    id: "provider_tide",
+    email: "tide@localhost",
+    displayName: "Sofia Alvarez",
+    planId: "member",
+  });
+  await claimProvider({member: providerMember, providerId: "tide-tone"});
+  const completed = await completeMemberBooking({member: providerMember, bookingId: created.booking.id});
+  assert.equal(completed.booking.status, "completed");
+  assert.equal(completed.payout?.status, "estimated");
+  assert.equal(completed.payout?.netPayout, 96);
+});
+
 test("lets an approved catalog practice be claimed once", async () => {
   const member = await seedMember();
   const claimed = await claimProvider({member, providerId: "tide-tone"});

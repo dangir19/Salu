@@ -9,7 +9,7 @@ import {
   type StripeAccount,
   type StripeTransfer,
 } from "../payments/stripe";
-import {bookingGrossCredits, catalogPractices, creditsToUsdCents, findCatalogPractice, splitMarketplaceAmount} from "./catalog";
+import {bookingGrossCredits, catalogPractices, creditsToUsdCents, DEFAULT_COMMISSION_RATE, findCatalogPractice, splitMarketplaceAmount} from "./catalog";
 import {connectStatusFromAccount, isPayoutsEnabled} from "./status";
 
 export class ConnectError extends Error {
@@ -167,8 +167,12 @@ export async function findProvider(input: {
 export async function claimProvider(input: {
   member: Member;
   providerId: string;
+  practiceName?: string;
 }): Promise<Provider> {
-  const practice = findCatalogPractice(input.providerId);
+  const practice = findCatalogPractice(input.providerId)
+    ?? (input.practiceName
+      ? {id: input.providerId, name: input.practiceName, commissionRate: DEFAULT_COMMISSION_RATE}
+      : null);
   if (!practice) throw new ConnectError("That practice is not on the Salu menu.");
   const existingForMember = await findProvider({memberId: input.member.id});
   if (existingForMember && existingForMember.id !== practice.id) {
@@ -218,12 +222,17 @@ export async function syncProviderFromAccount(input: {
 export async function startConnectOnboarding(input: {
   member: Member;
   providerId?: string;
+  practiceName?: string;
   origin: string;
   env: StripeEnv;
 }): Promise<{url: string | null; demo: boolean; provider: Provider; status: ConnectStatus}> {
   const providerId = input.providerId || (await findProvider({memberId: input.member.id}))?.id;
   if (!providerId) throw new ConnectError("Choose a practice before setting up payouts.");
-  const provider = await claimProvider({member: input.member, providerId});
+  const provider = await claimProvider({
+    member: input.member,
+    providerId,
+    practiceName: input.practiceName,
+  });
   if (!isStripeReady(input.env)) {
     return {url: null, demo: true, provider, status: provider.connectStatus};
   }
