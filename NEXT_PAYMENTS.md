@@ -10,6 +10,7 @@ This file is only the **Connect** follow-up. Do **not** treat wallet contributio
 - Stripe Checkout for one-time Credit top-ups (100 / 200 / 500)
 - Webhooks: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`, `charge.refunded`
 - D1 `wallets`, `credit_transactions`, `stripe_events` plus `members.stripe_customer_id` / `stripe_subscription_id`
+- Member booking create / list / reschedule / cancel on D1 (`BOOKINGS.md`) — Credit spend/refund stays on the wallet ledger
 - Profile billing reads `/api/payments/me` (card last4 when Stripe has one)
 - Demo fallback when `STRIPE_SECRET_KEY` is missing
 
@@ -18,7 +19,7 @@ This file is only the **Connect** follow-up. Do **not** treat wallet contributio
 1. **Stripe Connect** for provider payouts, keeping gross member spend, commission, and net payout separate (`ProviderPayout`).
 2. Webhooks: `account.updated`, plus transfer/payout events.
 3. `STRIPE_CONNECT_CLIENT_ID` and connected-account onboarding for approved providers.
-4. Booking persistence that can attach a `PlatformCommission` when an appointment completes (out of scope here).
+4. Attach a `PlatformCommission` when a persisted booking completes (bookings themselves are in `BOOKINGS.md`).
 
 ## Suggested env keys (do not add until that PR)
 

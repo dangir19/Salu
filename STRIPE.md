@@ -120,7 +120,7 @@ Events are stored in `stripe_events` so a retry does not double-credit. Choosing
 
 `drizzle/0001_payments.sql` adds `members.stripe_*`, `wallets`, `credit_transactions`, and `stripe_events`. The worker also `CREATE TABLE IF NOT EXISTS` on first use. Apply the SQL in the Cloudflare D1 console if you want the schema in place before the first webhook.
 
-Bookings stay in the browser demo store. This PR only persists membership + Credit funding.
+Booking spend and refunds use this same ledger. Appointment rows live in `drizzle/0002_bookings.sql` — see [BOOKINGS.md](./BOOKINGS.md).
 
 ## Accounting reminder
 

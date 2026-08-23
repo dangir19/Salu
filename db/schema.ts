@@ -51,3 +51,21 @@ export const stripeEvents = sqliteTable("stripe_events", {
   type: text("type").notNull(),
   processedAt: text("processed_at").notNull(),
 });
+
+export const bookings = sqliteTable("bookings", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id").notNull(),
+  serviceId: text("service_id").notNull(),
+  serviceName: text("service_name").notNull(),
+  provider: text("provider").notNull(),
+  availabilityId: text("availability_id"),
+  date: text("date").notNull(),
+  startsAt: text("starts_at"),
+  mode: text("mode").notNull(),
+  status: text("status").notNull(),
+  creditsCharged: integer("credits_charged").notNull().default(0),
+  packageName: text("package_name"),
+  packageItem: text("package_item"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});

@@ -53,6 +53,11 @@ const worker = {
       return handlePaymentsFetch(request, env as unknown as Record<string, string | undefined>);
     }
 
+    if (url.pathname.startsWith("/api/bookings")) {
+      const {handleBookingsFetch} = await import("../bookings/handlers");
+      return handleBookingsFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];
       return handleImageOptimization(request, {

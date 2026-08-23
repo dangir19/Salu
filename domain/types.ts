@@ -14,7 +14,24 @@ export type Provider={id:ID;name:string;status:"demo"|"pending"|"approved";commi
 export type ProviderCredential={id:ID;providerId:ID;label:string;status:"prototype"|"pending_review"|"verified"};
 export type Service={id:ID;providerId:ID;name:string;mode:"home"|"virtual"|"location";standardPrice:number;memberPrice:number};
 export type AppointmentAvailability={id:ID;serviceId:ID;startsAt:string;status:"open"|"held"|"booked"};
-export type Booking={id:ID;memberId:ID;serviceId:ID;availabilityId:ID;status:"held"|"confirmed"|"completed"|"cancelled";creditsCharged:number};
+export type BookingStatus="held"|"confirmed"|"completed"|"cancelled";
+export type Booking={
+  id:ID;
+  memberId:ID;
+  serviceId:ID;
+  availabilityId?:ID;
+  status:BookingStatus;
+  creditsCharged:number;
+  serviceName:string;
+  provider:string;
+  date:string;
+  startsAt?:string;
+  mode:string;
+  packageName?:string;
+  packageItem?:string;
+  createdAt:string;
+  updatedAt:string;
+};
 export type PlatformCommission={bookingId:ID;rate:number;amount:number};
 export type ProviderPayout={id:ID;bookingId:ID;grossAmount:number;commissionAmount:number;netPayout:number;status:"estimated"|"scheduled"|"paid"};
 export type Package={id:ID;name:string;priceCredits:number;expiresAfterDays:number};
