@@ -14,7 +14,9 @@ pnpm dev
 
 No Google or Apple secrets are required to compile, lint, or test. In development, sign-in offers a labeled **local preview** bypass. Open the local URL printed by the development server.
 
-To enable real Google / Apple member login, follow **[AUTH.md](./AUTH.md)** (Google Cloud OAuth client, Apple Services ID, `AUTH_*` env on Cloudflare / OpenAI hosting). Stripe Billing is **not** in this release — see **[NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md)**.
+To enable real Google / Apple member login, follow **[AUTH.md](./AUTH.md)** (Google Cloud OAuth client, Apple Services ID, `AUTH_*` env on the Cloudflare Worker). Stripe Billing is **not** in this release — see **[NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md)**.
+
+Production hosting is a Cloudflare Worker named `salu`, deployed by GitHub Actions on every push to `main`. See **[DEPLOY.md](./DEPLOY.md)** for token permissions and secrets. Do not move **joinsalu.com** off Codex Sites until **[CUTOVER.md](./CUTOVER.md)**.
 
 Production validation:
 
@@ -62,8 +64,11 @@ domain/
   payments.ts         Stripe hooks for the following PR
 db/                   D1/Drizzle members + member_accounts
 worker/               Cloudflare entry; /api/auth and /api/me intercept
-.openai/hosting.json  Sites deploy + D1 binding `DB`
-tests/                Render/build and auth identity checks
+wrangler.jsonc        Production Worker `salu` (CI deploy; no joinsalu.com route)
+.github/workflows/    Verify on PRs; deploy to Workers on `main`
+DEPLOY.md / CUTOVER.md Cloudflare token, secrets, and DNS switch
+.openai/hosting.json  Local / Codex Sites metadata + D1 binding `DB`
+tests/                Render/build, auth identity, and deploy-config checks
 ```
 
 Bookings, Credits and package sessions still survive local review in browser storage. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue.

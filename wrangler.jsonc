@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Production Worker for GitHub Actions + `pnpm deploy`.
+  // Do not add joinsalu.com routes here — attaching the custom domain is a
+  // manual cutover (see CUTOVER.md) so Codex Sites stays live until then.
+  "name": "salu",
+  "compatibility_date": "2026-08-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./worker/index.ts",
+  "workers_dev": true,
+  "preview_urls": true,
+  "keep_vars": true,
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    // Let the vinext Worker own HTML routes (/about, /atlas, /explore, …).
+    // SPA "single-page-application" fallback would break RSC payloads.
+    "not_found_handling": "none",
+    "binding": "ASSETS"
+  },
+  "images": {
+    "binding": "IMAGES"
+  }
+}
