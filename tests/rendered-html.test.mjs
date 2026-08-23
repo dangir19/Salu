@@ -189,6 +189,7 @@ test("exposes shareable member routes and a branded unknown-page state",()=>{
  assert.match(catchAll,/notFound\(\)/);
  assert.match(notFound,/This page isn’t on the map/);
  assert.match(notFound,/Back to Salu/);
+ assert.match(notFound,/from "next\/link"/);
 });
 test("uses package sessions before charging Credits and labels demo billing",()=>{
  assert.match(app,/confirmed using a \$\{pack\.name\} session/);
