@@ -83,6 +83,7 @@
 .conversation-scroll{max-height:none}
 .bubble{max-width:93%}
 .atlas-options{margin-left:0}
+.atlas-confirm-card,.atlas-windows{margin-left:0}
 .compact-service{gap:10px}
 .compact-service span{display:none}
 .atlas-boundary{font-size:9px}
