@@ -40,6 +40,7 @@ test("registers Google, Apple and a development-only bypass", () => {
   assert.match(config, /from "@auth\/core\/providers\/google"/);
   assert.match(config, /from "@auth\/core\/providers\/apple"/);
   assert.match(config, /id: "development"/);
+  assert.match(config, /id: "provider-development"/);
   assert.match(config, /if \(surface\.development\)/);
   assert.match(envFile, /DEV_AUTH_SECRET/);
   assert.match(envFile, /isProductionEnv/);

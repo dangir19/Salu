@@ -28,6 +28,8 @@ export type UiBooking = {
   status: UiBookingStatus;
   packageName?: string;
   packageItem?: string;
+  assignment?: "unassigned" | "accepted" | "proposed" | "declined";
+  proposedDate?: string;
 };
 
 const memory = new Map<string, Booking>();
@@ -48,11 +50,43 @@ export function toUiBooking(booking: Booking): UiBooking {
     status: booking.status === "cancelled" ? "Cancelled" : booking.status === "completed" ? "Completed" : "Upcoming",
     packageName: booking.packageName,
     packageItem: booking.packageItem,
+    assignment: booking.assignment,
+    proposedDate: booking.proposedDate,
   };
 }
 
 function sortBookings(rows: Booking[]): Booking[] {
   return [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
+}
+
+async function attachRequest(booking: Booking): Promise<Booking> {
+  try {
+    const provider = await import("../provider/service");
+    if (booking.status === "cancelled") {
+      await provider.cancelRequestForBooking(booking.id);
+    } else {
+      const {findMemberRecord} = await import("../auth/members");
+      const member = await findMemberRecord({id: booking.memberId});
+      if (member) await provider.createRequestFromBooking({booking, member});
+    }
+    const request = await provider.requestForBooking(booking.id);
+    if (!request) return booking;
+    return {
+      ...booking,
+      assignment: request.status === "open" || request.status === "cancelled"
+        ? "unassigned"
+        : request.status === "accepted" || request.status === "proposed" || request.status === "declined"
+          ? request.status
+          : "unassigned",
+      proposedDate: request.proposedDate,
+    };
+  } catch {
+    return booking;
+  }
+}
+
+async function attachRequests(rows: Booking[]): Promise<Booking[]> {
+  return Promise.all(rows.map(attachRequest));
 }
 
 async function persistBooking(booking: Booking): Promise<void> {
@@ -93,12 +127,12 @@ export async function listMemberBookings(memberId: string): Promise<Booking[]> {
     const persisted = await db.listBookingsForMember(memberId);
     if (persisted) {
       for (const row of persisted) memory.set(row.id, row);
-      return persisted;
+      return attachRequests(persisted);
     }
   } catch {
     // Memory fallback.
   }
-  return sortBookings([...memory.values()].filter((row) => row.memberId === memberId));
+  return attachRequests(sortBookings([...memory.values()].filter((row) => row.memberId === memberId)));
 }
 
 export async function createMemberBooking(input: {
@@ -170,7 +204,8 @@ export async function createMemberBooking(input: {
   }
 
   await persistBooking(booking);
-  return {booking, creditsApplied, availableCredits};
+  const withRequest = await attachRequest(booking);
+  return {booking: withRequest, creditsApplied, availableCredits};
 }
 
 export async function rescheduleMemberBooking(input: {
@@ -189,7 +224,7 @@ export async function rescheduleMemberBooking(input: {
   if (!date) throw new BookingError("Choose a new time for this reservation.");
   const next: Booking = {...booking, date, updatedAt: new Date().toISOString()};
   await persistBooking(next);
-  return next;
+  return attachRequest(next);
 }
 
 export async function cancelMemberBooking(input: {
@@ -221,7 +256,7 @@ export async function cancelMemberBooking(input: {
     bookingId: booking.id,
     label: `Refund · ${booking.serviceName}`,
   });
-  return {booking: next, creditsApplied: restored.applied, availableCredits: restored.availableCredits};
+  return {booking: await attachRequest(next), creditsApplied: restored.applied, availableCredits: restored.availableCredits};
 }
 
 export {InsufficientCreditsError};

@@ -3,9 +3,11 @@ import {chatgptUserFromHeaders} from "./chatgpt";
 import {authSurface, readAuthEnv, usesSecureCookies} from "./env";
 import {memberFromIdentity, sessionFromMember, type MemberSession} from "./identity";
 import {upsertMemberRecord} from "./members";
+import type {ProviderSession} from "../provider/session";
 
 export type MeResponse = {
   member: MemberSession | null;
+  provider: ProviderSession | null;
   providers: ReturnType<typeof authSurface>;
 };
 
@@ -47,8 +49,19 @@ export async function getMemberSession(request?: Request, headerStore?: Headers)
 }
 
 export async function getMePayload(request?: Request, headerStore?: Headers): Promise<MeResponse> {
+  const member = await getMemberSession(request, headerStore);
+  let provider: ProviderSession | null = null;
+  if (member) {
+    try {
+      const {providerSessionFromMember} = await import("../provider/session");
+      provider = await providerSessionFromMember(member);
+    } catch {
+      provider = null;
+    }
+  }
   return {
-    member: await getMemberSession(request, headerStore),
+    member,
+    provider,
     providers: authSurface(readAuthEnv()),
   };
 }

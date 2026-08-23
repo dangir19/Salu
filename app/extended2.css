@@ -74,3 +74,15 @@
 .approval{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-top:1px solid var(--line)}
 .approval>div{display:flex;flex-direction:column;gap:5px}
 .approval small{color:var(--muted)}
+.provider-live-banner,.provider-toast{background:#f0e3cf;border-left:3px solid var(--gold);padding:14px 16px;margin:0 0 18px;font-size:13px;line-height:1.5}
+.provider-signin-cta{margin-top:22px}
+.provider-signin-cta .primary-button{display:inline-flex;min-height:48px;padding:0 22px;align-items:center}
+.request-card{display:grid;grid-template-columns:1fr auto;gap:16px;padding:18px 0;border-top:1px solid var(--line);align-items:start}
+.request-card h3{font:22px var(--serif);margin:4px 0}
+.request-card p{color:var(--muted);font-size:13px;margin:4px 0 0}
+.request-note{color:var(--forest)!important}
+.request-actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.request-actions button,.propose-form button,.request-card>button{border:0;background:var(--sage);border-radius:7px;padding:8px 12px;font-weight:700}
+.request-empty{color:var(--muted);padding:12px 0}
+.propose-form{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:12px;align-items:end}
+.propose-form label{display:flex;flex-direction:column;gap:6px;font-size:12px}

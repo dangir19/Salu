@@ -44,7 +44,7 @@ The Worker intercepts `/api/atlas` (same pattern as auth, payments, and bookings
 
 | Session | Result |
 | --- | --- |
-| Signed-in member | `create_booking` writes through the booking service (D1 when `DB` is bound, otherwise in-process). The chat confirmation card deep-links to **Appointments**. |
+| Signed-in member | `create_booking` writes through the booking service (D1 when `DB` is bound, otherwise in-process). That also opens an assignable provider request ([PROVIDER.md](./PROVIDER.md)). The chat confirmation card deep-links to **Appointments**. |
 | No session | Tools still discover and read windows. `create_booking` returns a labeled **demo** reservation for the client to keep in `localStorage`. |
 
 A local preview session (development bypass) is a real member session, so Atlas bookings persist like any other `/api/bookings` confirm.

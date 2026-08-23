@@ -33,6 +33,59 @@ export type ProviderApplication={
   createdAt:string;
   updatedAt:string;
 };
+export type ProviderAccountStatus="demo"|"approved";
+export type ProviderAccount={
+  id:ID;
+  memberId?:ID;
+  email:string;
+  displayName:string;
+  practiceId:string;
+  practiceName:string;
+  status:ProviderAccountStatus;
+  serviceIds:string[];
+  createdAt:string;
+  updatedAt:string;
+};
+export type AppointmentRequestStatus="open"|"accepted"|"declined"|"proposed"|"cancelled";
+export type AppointmentRequest={
+  id:ID;
+  bookingId:ID;
+  memberId:ID;
+  memberDisplayName:string;
+  serviceId:string;
+  serviceName:string;
+  practiceId:string;
+  practiceName:string;
+  date:string;
+  mode:string;
+  creditsCharged:number;
+  status:AppointmentRequestStatus;
+  assignedProviderId?:ID;
+  proposedDate?:string;
+  note?:string;
+  walkthrough?:boolean;
+  createdAt:string;
+  updatedAt:string;
+};
+export type ProviderAssignment={
+  id:ID;
+  requestId:ID;
+  bookingId:ID;
+  providerId:ID;
+  practiceId:string;
+  status:"accepted"|"declined"|"proposed";
+  proposedDate?:string;
+  createdAt:string;
+};
+export type ProviderBlock={
+  id:ID;
+  providerId:ID;
+  practiceId:string;
+  date:string;
+  note?:string;
+  createdAt:string;
+};
+export type BookingAssignment="unassigned"|"accepted"|"proposed"|"declined";
 export type ProviderCredential={id:ID;providerId:ID;label:string;status:"prototype"|"pending_review"|"verified"};
 export type Service={id:ID;providerId:ID;name:string;mode:"home"|"virtual"|"location";standardPrice:number;memberPrice:number};
 export type AppointmentAvailability={id:ID;serviceId:ID;startsAt:string;status:"open"|"held"|"booked"};
@@ -51,6 +104,8 @@ export type Booking={
   mode:string;
   packageName?:string;
   packageItem?:string;
+  assignment?:BookingAssignment;
+  proposedDate?:string;
   createdAt:string;
   updatedAt:string;
 };

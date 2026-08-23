@@ -72,6 +72,60 @@ export const providerApplications = sqliteTable("provider_applications", {
   updatedAt: text("updated_at").notNull(),
 });
 
+export const providerAccounts = sqliteTable("provider_accounts", {
+  id: text("id").primaryKey(),
+  memberId: text("member_id"),
+  email: text("email").notNull().unique(),
+  displayName: text("display_name").notNull(),
+  practiceId: text("practice_id").notNull(),
+  practiceName: text("practice_name").notNull(),
+  status: text("status").notNull(),
+  serviceIds: text("service_ids").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const appointmentRequests = sqliteTable("appointment_requests", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  memberId: text("member_id").notNull(),
+  memberDisplayName: text("member_display_name").notNull(),
+  serviceId: text("service_id").notNull(),
+  serviceName: text("service_name").notNull(),
+  practiceId: text("practice_id").notNull(),
+  practiceName: text("practice_name").notNull(),
+  date: text("date").notNull(),
+  mode: text("mode").notNull(),
+  creditsCharged: integer("credits_charged").notNull().default(0),
+  status: text("status").notNull(),
+  assignedProviderId: text("assigned_provider_id"),
+  proposedDate: text("proposed_date"),
+  note: text("note"),
+  walkthrough: integer("walkthrough").notNull().default(0),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const providerAssignments = sqliteTable("provider_assignments", {
+  id: text("id").primaryKey(),
+  requestId: text("request_id").notNull(),
+  bookingId: text("booking_id").notNull(),
+  providerId: text("provider_id").notNull(),
+  practiceId: text("practice_id").notNull(),
+  status: text("status").notNull(),
+  proposedDate: text("proposed_date"),
+  createdAt: text("created_at").notNull(),
+});
+
+export const providerBlocks = sqliteTable("provider_blocks", {
+  id: text("id").primaryKey(),
+  providerId: text("provider_id").notNull(),
+  practiceId: text("practice_id").notNull(),
+  date: text("date").notNull(),
+  note: text("note"),
+  createdAt: text("created_at").notNull(),
+});
+
 export const bookings = sqliteTable("bookings", {
   id: text("id").primaryKey(),
   memberId: text("member_id").notNull(),

@@ -10,7 +10,7 @@ Do **not** point `joinsalu.com` at the new Worker until [CUTOVER.md](./CUTOVER.m
 | --- | --- |
 | Worker name | `salu` |
 | Config | [`wrangler.jsonc`](./wrangler.jsonc) |
-| Entry | `worker/index.ts` (vinext App Router + `/api/auth` + `/api/me` + payments + bookings + providers) |
+| Entry | `worker/index.ts` (vinext App Router + `/api/auth` + `/api/me` + payments + bookings + Atlas + providers + provider) |
 | Preview URL | `https://salu.<your-subdomain>.workers.dev` after the first deploy |
 | Trigger | Push / merge to `main`, or **Actions → Deploy → Run workflow** |
 
@@ -129,6 +129,7 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0000_members.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0001_payments.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0003_provider_applications.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0004_provider_workspace.sql
 pnpm deploy
 ```
 

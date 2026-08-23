@@ -183,7 +183,7 @@ test("uses joinsalu.com metadata and a branded social preview",()=>{
  assert.doesNotMatch(layout,/Your health best friend/);
 });
 test("exposes shareable member routes and a branded unknown-page state",()=>{
- for(const path of ["/atlas","/explore","/appointments","/plans","/about","/credits","/profile","/join","/apply","/provider","/admin","/signin"]){assert.match(routes,new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
+ for(const path of ["/atlas","/explore","/appointments","/plans","/about","/credits","/profile","/join","/apply","/provider","/provider/signin","/admin","/signin"]){assert.match(routes,new RegExp(path.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
  assert.match(app,/history\.pushState/);
  assert.match(app,/popstate/);
  assert.match(app,/pageFromPath/);
