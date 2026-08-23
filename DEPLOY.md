@@ -130,6 +130,7 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0001_payments.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0003_provider_applications.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0004_provider_workspace.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0005_connect.sql
 pnpm deploy
 ```
 

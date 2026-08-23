@@ -21,6 +21,7 @@ interface Env {
   STRIPE_WEBHOOK_SECRET?: string;
   STRIPE_GOLD_PRICE_ID?: string;
   STRIPE_PLATINUM_PRICE_ID?: string;
+  STRIPE_CONNECT_CLIENT_ID?: string;
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
   IMAGES: {
@@ -55,6 +56,11 @@ const worker = {
     if (url.pathname.startsWith("/api/payments") || url.pathname.startsWith("/api/stripe")) {
       const {handlePaymentsFetch} = await import("../payments/handlers");
       return handlePaymentsFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
+    if (url.pathname.startsWith("/api/connect")) {
+      const {handleConnectFetch} = await import("../connect/handlers");
+      return handleConnectFetch(request, env as unknown as Record<string, string | undefined>);
     }
 
     if (url.pathname.startsWith("/api/bookings")) {

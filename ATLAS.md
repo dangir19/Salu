@@ -58,7 +58,7 @@ A local preview session (development bypass) is a real member session, so Atlas 
 
 Copy `.env.example` to `.env` or `.dev.vars`. You do **not** need an OpenAI key to compile, lint, or test.
 
-On the Cloudflare Worker, paste `OPENAI_API_KEY` as a secret if you want the model path in production. Provider Connect and Cloudflare DNS cutover are out of scope here.
+On the Cloudflare Worker, paste `OPENAI_API_KEY` as a secret if you want the model path in production. Provider payouts are in [CONNECT.md](./CONNECT.md). Cloudflare DNS cutover is out of scope here.
 
 ## Still demo
 

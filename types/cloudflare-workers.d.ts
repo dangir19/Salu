@@ -18,6 +18,7 @@ declare module "cloudflare:workers" {
     STRIPE_WEBHOOK_SECRET?: string;
     STRIPE_GOLD_PRICE_ID?: string;
     STRIPE_PLATINUM_PRICE_ID?: string;
+    STRIPE_CONNECT_CLIENT_ID?: string;
     OPENAI_API_KEY?: string;
     OPENAI_MODEL?: string;
     [key: string]: unknown;

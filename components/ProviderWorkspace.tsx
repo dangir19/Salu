@@ -8,7 +8,15 @@ import type {Page} from "../domain/mock-data";
 import type {ProviderAccount} from "../domain/types";
 import {ProviderSignIn} from "./SignIn";
 
-type WorkspaceTab = "requests" | "schedule";
+type WorkspaceTab = "requests" | "schedule" | "payouts";
+type ConnectSnapshot = {
+  signedIn?: boolean;
+  status?: "not_connected" | "pending" | "payouts_enabled";
+  statusLabel?: string;
+  provider?: {id: string; name: string; connectStatus?: string} | null;
+  payouts?: Array<{id: string; bookingId: string; grossAmount: number; commissionAmount: number; netPayout: number; status: string}>;
+  message?: string;
+};
 type UiRequest = {
   id: string;
   bookingId: string;
@@ -50,6 +58,78 @@ function PageHead({eyebrow, title, copy}:{eyebrow:string;title:string;copy?:stri
         {copy && <p>{copy}</p>}
       </div>
     </div>
+  );
+}
+
+function PayoutsCard({
+  status,
+  statusLabel,
+  practiceName,
+  busy,
+  onStart,
+  onDashboard,
+  payouts,
+}:{
+  status: NonNullable<ConnectSnapshot["status"]>;
+  statusLabel: string;
+  practiceName: string;
+  busy: boolean;
+  onStart:()=>void;
+  onDashboard:()=>void;
+  payouts?: ConnectSnapshot["payouts"];
+}) {
+  return (
+    <section className="portal-card payouts-card">
+      <div className="section-title">
+        <Eyebrow>DIRECT DEPOSIT</Eyebrow>
+        <h2>Set up payouts.</h2>
+      </div>
+      <div className="payout-status-row">
+        <span className={`status-pill payout-${status}`}>{statusLabel}</span>
+        <p>
+          {status === "payouts_enabled"
+            ? `Bank details are on file for ${practiceName}. Completed appointments create a Stripe transfer for the net payout.`
+            : status === "pending"
+              ? "Stripe still needs a few details before payouts can leave the platform."
+              : "Not connected. Finish Express onboarding in Stripe test mode so completed bookings can transfer the net payout."}
+        </p>
+      </div>
+      <div className="payout-actions">
+        {status !== "payouts_enabled" && (
+          <button type="button" className="primary-button" disabled={busy} onClick={onStart}>
+            {busy ? "Opening Stripe…" : "Set up payouts"}
+          </button>
+        )}
+        {status === "payouts_enabled" && (
+          <button type="button" className="primary-button" disabled={busy} onClick={onDashboard}>
+            {busy ? "Opening Stripe…" : "Open payouts dashboard"}
+          </button>
+        )}
+        {status === "pending" && (
+          <button type="button" className="ghost-button" disabled={busy} onClick={onStart}>
+            Continue setup
+          </button>
+        )}
+      </div>
+      <p className="payout-note">
+        Wallet Credits stay customer liabilities. Commission is Salu revenue. The transfer is the provider payout only.
+      </p>
+      {!!payouts?.length && (
+        <div className="section-title" style={{marginTop: 20}}>
+          <Eyebrow>TRANSFERS</Eyebrow>
+          <h2>Settled appointments.</h2>
+        </div>
+      )}
+      {payouts?.map((payout) => (
+        <div className="portal-row" key={payout.id}>
+          <span>{payout.bookingId}</span>
+          <span>Gross ${payout.grossAmount}</span>
+          <span>Commission ${payout.commissionAmount}</span>
+          <span>Net ${payout.netPayout}</span>
+          <span className="status-pill">{payout.status}</span>
+        </div>
+      ))}
+    </section>
   );
 }
 
@@ -97,7 +177,7 @@ function DemoPortal({go}:{go:(p:Page)=>void}) {
             <span key={x[0]}><small>{x[0]}</small><b>{x[1]}</b></span>
           ))}
         </div>
-        <p>Platinum example: $120 member price − $24 commission = $96 provider payout. Package redemptions and credentials are fabricated prototype data. Stripe Connect is not in this workspace.</p>
+        <p>Platinum example: $120 member price − $24 commission = $96 provider payout. Sign in to set up Stripe Connect on this practice.</p>
       </section>
       <div className="provider-signin-cta">
         <Link className="primary-button" href="/provider/signin">Provider sign-in</Link>
@@ -132,7 +212,7 @@ function PortalFrame({
           <>
             <button type="button" className={tab === "requests" ? "active" : ""} onClick={() => setTab("requests")}>Requests</button>
             <button type="button" className={tab === "schedule" ? "active" : ""} onClick={() => setTab("schedule")}>Schedule</button>
-            <span className="portal-nav unavailable">Finance<small>Demo only · Connect later</small></span>
+            <button type="button" className={tab === "payouts" ? "active" : ""} onClick={() => setTab("payouts")}>Payouts</button>
             <span className="portal-nav unavailable">Settings<small>Demo only</small></span>
           </>
         ) : (
@@ -173,13 +253,18 @@ export default function ProviderWorkspace({
   const [proposeDate, setProposeDate] = useState(PROPOSE_TIMES[0]);
   const [blockDate, setBlockDate] = useState(BLOCK_TIMES[0]);
   const [source, setSource] = useState<"demo" | "server">(provider ? "server" : "demo");
+  const [connect, setConnect] = useState<ConnectSnapshot | null>(null);
+  const [payoutBusy, setPayoutBusy] = useState(false);
+  const connectStatus = connect?.status ?? "not_connected";
+  const connectLabel = connect?.statusLabel ?? (connectStatus === "payouts_enabled" ? "Payouts enabled" : connectStatus === "pending" ? "Pending" : "Not connected");
 
   const refresh = () => {
     if (!provider) return;
     Promise.all([
       fetch("/api/provider/requests").then((res) => res.json()) as Promise<InboxSnapshot>,
       fetch("/api/provider/schedule").then((res) => res.json()) as Promise<InboxSnapshot>,
-    ]).then(([inbox, schedule]) => {
+      fetch("/api/connect/me").then((res) => res.json()) as Promise<ConnectSnapshot>,
+    ]).then(([inbox, schedule, payouts]) => {
       if (inbox.source === "server" && Array.isArray(inbox.requests)) {
         setSource("server");
         setRequests(inbox.requests);
@@ -188,6 +273,7 @@ export default function ProviderWorkspace({
         if (Array.isArray(schedule.jobs)) setJobs(schedule.jobs);
         if (Array.isArray(schedule.blocks)) setBlocks(schedule.blocks);
       }
+      setConnect(payouts);
       if (inbox.error) setToast(inbox.error);
     }).catch(() => undefined);
   };
@@ -196,8 +282,25 @@ export default function ProviderWorkspace({
   useEffect(() => {
     if (!provider) return;
     refresh();
+    const params = new URLSearchParams(window.location.search);
+    const returned = params.get("connect");
+    const returnedMessage = returned === "return"
+      ? "Returned from Stripe. Payouts enable after account.updated — usually instantly."
+      : returned === "refresh"
+        ? "Stripe needs you to restart payout setup."
+        : "";
+    if (returned) {
+      params.delete("connect");
+      window.history.replaceState({}, "", `${window.location.pathname}${params.toString() ? `?${params}` : ""}`);
+    }
+    const toastTimer = returnedMessage
+      ? window.setTimeout(() => setToast(returnedMessage), 0)
+      : 0;
     const timer = window.setInterval(refresh, 4000);
-    return () => window.clearInterval(timer);
+    return () => {
+      if (toastTimer) window.clearTimeout(toastTimer);
+      window.clearInterval(timer);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh closes over the latest setters.
   }, [provider]);
 
@@ -233,6 +336,69 @@ export default function ProviderWorkspace({
     }
   };
 
+  const startOnboard = async () => {
+    setPayoutBusy(true);
+    try {
+      const res = await fetch("/api/connect/onboard", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({providerId: provider?.practiceId}),
+      });
+      const data = await res.json() as {url?: string | null; demo?: boolean; message?: string; error?: string};
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      if (data.demo) {
+        setToast(data.message || "Stripe Connect is not connected yet. This preview still uses labeled demo payouts.");
+        refresh();
+        return;
+      }
+      if (data.error) setToast(data.error);
+    } finally {
+      setPayoutBusy(false);
+    }
+  };
+
+  const openDashboard = async () => {
+    setPayoutBusy(true);
+    try {
+      const res = await fetch("/api/connect/login", {method: "POST"});
+      const data = await res.json() as {url?: string | null; error?: string};
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
+      setToast(data.error || "Stripe Connect is not connected yet");
+    } finally {
+      setPayoutBusy(false);
+    }
+  };
+
+  const completeJob = async (bookingId: string) => {
+    setBusyId(bookingId);
+    try {
+      const res = await fetch("/api/bookings/complete", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({id: bookingId}),
+      });
+      const data = await res.json() as {error?: string; payout?: {status: string; netPayout: number}};
+      if (data.error) {
+        setToast(data.error);
+        return;
+      }
+      setToast(data.payout
+        ? `Visit completed · ${data.payout.netPayout} Credits ${data.payout.status} for the provider.`
+        : "Visit marked complete.");
+      refresh();
+    } catch {
+      setToast("That visit could not be completed just now.");
+    } finally {
+      setBusyId("");
+    }
+  };
+
   if (!provider) {
     if (typeof window !== "undefined" && window.location.pathname === "/provider/signin") {
       return <ProviderSignIn surface={surface} returnTo="/provider" />;
@@ -257,14 +423,25 @@ export default function ProviderWorkspace({
           <PageHead
             eyebrow={`${provider.practiceName.toUpperCase()} · ${source === "server" ? "LIVE QUEUE" : "DEMO"}`}
             title="Incoming requests"
-            copy="Member bookings that need a provider land here. Accept, decline, or propose a new time. The queue refreshes every few seconds."
+            copy="Member bookings that need a provider land here. Accept, decline, or propose a new time, then set up payouts on this practice. The queue refreshes every few seconds."
           />
           <div className="portal-metrics">
             <article><strong>{openRequests.length}</strong><span>Open requests</span></article>
             <article><strong>{jobs.filter((job) => job.status === "accepted").length}</strong><span>Accepted jobs</span></article>
             <article><strong>{blocks.length}</strong><span>Blocked times</span></article>
-            <article><strong>—</strong><span>Payouts · Connect later</span></article>
+            <article>
+              <strong>{connectStatus === "payouts_enabled" ? "Live" : connectStatus === "pending" ? "…" : "—"}</strong>
+              <span>{connectStatus === "payouts_enabled" ? "Payouts enabled" : connectLabel}</span>
+            </article>
           </div>
+          <PayoutsCard
+            status={connectStatus}
+            statusLabel={connectLabel}
+            practiceName={provider.practiceName}
+            busy={payoutBusy}
+            onStart={() => {void startOnboard();}}
+            onDashboard={() => {void openDashboard();}}
+          />
           <section className="portal-card">
             <div className="section-title">
               <Eyebrow>IN-APP QUEUE</Eyebrow>
@@ -315,7 +492,7 @@ export default function ProviderWorkspace({
           <PageHead
             eyebrow={`${provider.practiceName.toUpperCase()} · CALENDAR`}
             title="Your week"
-            copy="Accepted jobs and times you have blocked. Stripe Connect payouts stay out of this view."
+            copy="Accepted jobs and times you have blocked. Finish Stripe Connect from Payouts, then mark a visit complete so the net transfer can leave the platform."
           />
           <section className="portal-card">
             <div className="section-title">
@@ -329,7 +506,13 @@ export default function ProviderWorkspace({
                   <h3>{job.serviceName}</h3>
                   <p>{job.memberDisplayName} · {job.mode}</p>
                 </div>
-                <span className="status-pill">Accepted</span>
+                <button
+                  type="button"
+                  disabled={busyId === job.bookingId}
+                  onClick={() => {void completeJob(job.bookingId);}}
+                >
+                  Mark complete
+                </button>
               </div>
             )) : <p className="request-empty">No accepted jobs yet. Take one from the request queue.</p>}
           </section>
@@ -364,6 +547,24 @@ export default function ProviderWorkspace({
               </div>
             ))}
           </section>
+        </>
+      )}
+      {tab === "payouts" && (
+        <>
+          <PageHead
+            eyebrow={`${provider.practiceName.toUpperCase()} · PAYOUTS`}
+            title="Direct deposit"
+            copy="Set up Stripe Connect Express on this practice. Completed bookings transfer the provider share; Salu keeps the commission."
+          />
+          <PayoutsCard
+            status={connectStatus}
+            statusLabel={connectLabel}
+            practiceName={provider.practiceName}
+            busy={payoutBusy}
+            onStart={() => {void startOnboard();}}
+            onDashboard={() => {void openDashboard();}}
+            payouts={connect?.payouts}
+          />
         </>
       )}
     </PortalFrame>

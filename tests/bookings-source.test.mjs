@@ -12,6 +12,7 @@ test("wires member booking APIs and keeps a labeled demo fallback", () => {
   for (const term of [
     "/api/bookings",
     "/api/bookings/cancel",
+    "/api/bookings/complete",
     "/api/bookings/reschedule",
     "confirmServerBooking",
     "cancelServerBooking",

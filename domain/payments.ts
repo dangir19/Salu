@@ -3,7 +3,7 @@ import type {ID, PaymentMethod, PaymentsPort} from "./types";
 /**
  * Live Stripe Billing is server-side (`payments/` + `/api/payments/*`).
  * This port stays null in the browser until `/api/payments/me` returns a card.
- * Stripe Connect / provider payouts are a later PR.
+ * Stripe Connect / provider payouts live in `connect/` + `/api/connect/*`.
  */
 export const payments: PaymentsPort = {
   async getDefaultPaymentMethod(memberId: ID): Promise<PaymentMethod | null> {
@@ -19,4 +19,4 @@ export const PAYMENT_PLACEHOLDER = {
 } as const;
 
 export const STRIPE_BILLING_NOTE =
-  "Cards are charged by Stripe. Wallet Credits are customer funds — not Salu revenue. Provider payouts (Connect) are a later release.";
+  "Cards are charged by Stripe. Wallet Credits are customer funds — not Salu revenue. Provider payouts move through Stripe Connect transfers.";

@@ -120,6 +120,21 @@ async function storedBooking(id: string): Promise<Booking | null> {
   return memory.get(id) ?? null;
 }
 
+export async function listProviderBookings(providerName: string): Promise<Booking[]> {
+  try {
+    const db = await import("../db/bookings");
+    await db.ensureBookingsSchema();
+    const persisted = await db.listBookingsForProvider(providerName);
+    if (persisted) {
+      for (const row of persisted) memory.set(row.id, row);
+      return persisted;
+    }
+  } catch {
+    // Memory fallback.
+  }
+  return sortBookings([...memory.values()].filter((row) => row.provider === providerName));
+}
+
 export async function listMemberBookings(memberId: string): Promise<Booking[]> {
   try {
     const db = await import("../db/bookings");
@@ -225,6 +240,68 @@ export async function rescheduleMemberBooking(input: {
   const next: Booking = {...booking, date, updatedAt: new Date().toISOString()};
   await persistBooking(next);
   return attachRequest(next);
+}
+
+export async function completeMemberBooking(input: {
+  member: Member;
+  bookingId: string;
+}): Promise<{booking: Booking; payout: import("../domain/types").ProviderPayout | null}> {
+  const booking = await storedBooking(input.bookingId);
+  if (!booking) {
+    throw new BookingError("That reservation is not on the calendar.", 404);
+  }
+  const ownsBooking = booking.memberId === input.member.id;
+  let providerOwns = false;
+  if (!ownsBooking) {
+    try {
+      const connect = await import("../connect/service");
+      let provider = await connect.findProvider({memberId: input.member.id});
+      if (!provider) {
+        const {resolveProviderAccount} = await import("../provider/service");
+        const account = await resolveProviderAccount({
+          id: input.member.id,
+          email: input.member.email,
+          displayName: input.member.displayName,
+          memberId: input.member.id,
+        });
+        if (account && (account.practiceName === booking.provider || account.practiceId === booking.serviceId)) {
+          provider = await connect.claimProvider({
+            member: input.member,
+            providerId: account.practiceId,
+            practiceName: account.practiceName,
+          });
+        }
+      }
+      providerOwns = Boolean(provider && provider.name === booking.provider);
+    } catch {
+      providerOwns = false;
+    }
+  }
+  if (!ownsBooking && !providerOwns) {
+    throw new BookingError("That reservation is not on your calendar.", 404);
+  }
+  if (booking.status === "cancelled") {
+    throw new BookingError("A cancelled reservation cannot be completed.");
+  }
+
+  const next: Booking = booking.status === "completed"
+    ? booking
+    : {
+      ...booking,
+      status: "completed",
+      updatedAt: new Date().toISOString(),
+    };
+  if (next !== booking) await persistBooking(next);
+
+  let payout = null;
+  try {
+    const connect = await import("../connect/service");
+    const {readStripeEnv} = await import("../payments/env");
+    payout = await connect.settleBookingPayout({booking: next, env: readStripeEnv()});
+  } catch {
+    payout = null;
+  }
+  return {booking: next, payout};
 }
 
 export async function cancelMemberBooking(input: {

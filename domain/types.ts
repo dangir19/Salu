@@ -4,13 +4,26 @@ export type MembershipStatus = "none"|"incomplete"|"active"|"past_due"|"canceled
 export type PlanName = "Member"|"Gold"|"Platinum";
 export type Member={id:ID;email:string;displayName:string;householdId?:ID;planId:ID;authProvider?:AuthProvider;image?:string;createdAt?:string;stripeCustomerId?:string;stripeSubscriptionId?:string;membershipStatus?:MembershipStatus};
 export type PaymentMethod={brand:string;last4:string;expMonth:number;expYear:number};
-export type PaymentsSurface={stripe:boolean;goldPrice:boolean;platinumPrice:boolean;webhook:boolean;publishable:boolean};
+export type PaymentsSurface={stripe:boolean;goldPrice:boolean;platinumPrice:boolean;webhook:boolean;publishable:boolean;connect?:boolean};
 export type PaymentsPort={getDefaultPaymentMethod(memberId:ID):Promise<PaymentMethod|null>};
+export type ConnectStatus="not_connected"|"pending"|"payouts_enabled";
 export type Household={id:ID;name:string;memberIds:ID[];walletId:ID};
 export type MembershipPlan={id:ID;name:PlanName;monthlyContribution:number;discountPercent:0|10|20;creditsRollOver:boolean;householdSlots:number};
 export type Wallet={id:ID;householdId:ID;availableCredits:number};
 export type CreditTransaction={id:ID;walletId:ID;kind:"contribution"|"booking"|"refund"|"adjustment"|"topup";credits:number;createdAt:string;bookingId?:ID;label?:string;stripeEventId?:string;stripeObjectId?:string};
-export type Provider={id:ID;name:string;status:"demo"|"pending"|"approved";commissionRate:number};
+export type Provider={
+  id:ID;
+  name:string;
+  email?:string;
+  memberId?:ID;
+  status:"demo"|"pending"|"approved";
+  commissionRate:number;
+  stripeConnectAccountId?:string;
+  connectStatus:ConnectStatus;
+  chargesEnabled?:boolean;
+  payoutsEnabled?:boolean;
+  detailsSubmitted?:boolean;
+};
 export type ProviderApplicationStatus="submitted"|"under_review"|"approved"|"rejected";
 export type ProviderLicenseType="LMT"|"RN"|"Acupuncture Physician"|"Esthetician"|"Stretch practitioner"|"Other";
 export type ProviderDocStatus="missing"|"received";
@@ -110,7 +123,17 @@ export type Booking={
   updatedAt:string;
 };
 export type PlatformCommission={bookingId:ID;rate:number;amount:number};
-export type ProviderPayout={id:ID;bookingId:ID;grossAmount:number;commissionAmount:number;netPayout:number;status:"estimated"|"scheduled"|"paid"};
+export type ProviderPayoutStatus="estimated"|"scheduled"|"paid"|"failed";
+export type ProviderPayout={
+  id:ID;
+  bookingId:ID;
+  providerId:ID;
+  grossAmount:number;
+  commissionAmount:number;
+  netPayout:number;
+  status:ProviderPayoutStatus;
+  stripeTransferId?:string;
+};
 export type Package={id:ID;name:string;priceCredits:number;expiresAfterDays:number};
 export type PackagePurchase={id:ID;packageId:ID;memberId:ID;purchasedAt:string;expiresAt:string};
 export type PackageEntitlement={id:ID;purchaseId:ID;serviceCategory:string;granted:number;remaining:number};

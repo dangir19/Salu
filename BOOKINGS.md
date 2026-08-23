@@ -20,6 +20,7 @@ Member appointments persist on the server (D1) for signed-in sessions. Refreshin
 | `POST` | `/api/bookings` | Confirm. Body: `serviceId`, `date`, `mode`, optional `packageName` / `packageItem`. |
 | `POST` | `/api/bookings/reschedule` | Body: `id`, `date`. No Credit movement. |
 | `POST` | `/api/bookings/cancel` | Body: `id`. Restores Credits once when the booking had charged Credits. |
+| `POST` | `/api/bookings/complete` | Body: `id`. Marks the reservation completed and settles a Connect payout ([CONNECT.md](./CONNECT.md)). |
 
 The Worker intercepts `/api/bookings` (same pattern as `/api/auth` and `/api/payments`). Catalog prices and Gold / Platinum discounts are computed on the server. When Stripe keys are present, a short wallet is rejected (`402`) instead of trusting the browser balance.
 
@@ -35,9 +36,12 @@ Auth and Stripe already use Cloudflare D1 as `DB` when the binding exists.
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0000_members.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0001_payments.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0002_bookings.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0003_provider_applications.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0004_provider_workspace.sql
+pnpm exec wrangler d1 execute salu --remote --file=drizzle/0005_connect.sql
 ```
 
-`0002_bookings.sql` adds `bookings` (`member_id`, service snapshot, display `date`, `status`, `credits_charged`, optional package fields). No extra env keys are required for bookings.
+`0002_bookings.sql` adds `bookings` (`member_id`, service snapshot, display `date`, `status`, `credits_charged`, optional package fields). Provider applications and Connect payouts are later migrations — see [PROVIDERS.md](./PROVIDERS.md) and [CONNECT.md](./CONNECT.md). No extra env keys are required for bookings.
 
 A confirmed reservation also opens an assignable **appointment request** for the catalog practice. Providers fill those in [PROVIDER.md](./PROVIDER.md).
 
@@ -48,5 +52,5 @@ You do **not** need live Stripe or Auth secrets to compile, lint, or test.
 - Package **remaining-session counts** stay in the browser. A booking can record `packageName` / `packageItem` and skip Credits; the pack inventory is not a D1 entitlement table yet.
 - Head of BD owns the Miami supplier pipeline (outreach, interviews, status); eng owns persistence and APIs — see [PROVIDERS.md](./PROVIDERS.md). The live provider request queue and calendar are in [PROVIDER.md](./PROVIDER.md).
 - Availability inventory is the Miami catalog (`domain/mock-data.ts`), not a held-slot table. Approved individual providers can appear in Explore; the mock catalog stays a labeled **demo**.
-- Stripe Connect / `ProviderPayout` is still the next payments step ([NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md)).
+- Completing a reservation (`POST /api/bookings/complete`) settles Stripe Connect payouts ([CONNECT.md](./CONNECT.md)). Without a connected Express account the payout stays `estimated`.
 - Atlas now books through this API; the optional language-model key, Cloudflare DNS cutover, and live credential-verification integrations are unchanged. See [ATLAS.md](./ATLAS.md).

@@ -4,6 +4,7 @@ import {applyStripeEnvToProcess, isStripeReady, readStripeEnv, type StripeEnv} f
 import {
   BookingError,
   cancelMemberBooking,
+  completeMemberBooking,
   createMemberBooking,
   InsufficientCreditsError,
   listMemberBookings,
@@ -59,6 +60,9 @@ export async function handleBookingsFetch(request: Request, runtimeEnv: RuntimeE
   }
   if (url.pathname === "/api/bookings/cancel" && request.method === "POST") {
     return handleCancel(request);
+  }
+  if (url.pathname === "/api/bookings/complete" && request.method === "POST") {
+    return handleComplete(request);
   }
   return new Response("Not found", {status: 404});
 }
@@ -176,6 +180,33 @@ async function handleCancel(request: Request): Promise<Response> {
       bookings: bookings.map(toUiBooking),
       creditsApplied: result.creditsApplied,
       wallet: {availableCredits: result.availableCredits},
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+async function handleComplete(request: Request): Promise<Response> {
+  const member = await requireMember(request);
+  if (!member) {
+    return json({source: "demo", error: "Sign in to complete a saved reservation."}, 401);
+  }
+
+  let body: {id?: string};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({source: "server", error: "Choose a reservation to complete."}, 400);
+  }
+
+  try {
+    const result = await completeMemberBooking({member, bookingId: body.id ?? ""});
+    const bookings = await listMemberBookings(member.id);
+    return json({
+      source: "server",
+      booking: toUiBooking(result.booking),
+      bookings: bookings.map(toUiBooking),
+      payout: result.payout,
     });
   } catch (error) {
     return errorResponse(error);
