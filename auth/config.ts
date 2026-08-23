@@ -84,6 +84,22 @@ export async function createAuthConfig(env: AuthEnv): Promise<AuthConfig> {
         },
       }),
     );
+    providers.push(
+      Credentials({
+        id: "admin-development",
+        name: "Demo admin",
+        credentials: {},
+        authorize: async () => {
+          if (!env.allowDevBypass) return null;
+          const {DEMO_ADMIN_EMAIL} = await import("../providers/env");
+          return {
+            id: "member_development_admin",
+            name: "Salu Admin",
+            email: DEMO_ADMIN_EMAIL,
+          };
+        },
+      }),
+    );
   }
 
   return {
@@ -103,6 +119,7 @@ export async function createAuthConfig(env: AuthEnv): Promise<AuthConfig> {
           token.authProvider = account?.provider ?? "development";
           token.memberSince = new Date().toISOString();
           if (account?.provider === "provider-development") token.role = "provider";
+          if (account?.provider === "admin-development") token.role = "admin";
         }
         const appleUser = (profile as {user?: {name?: {firstName?: string; lastName?: string}}} | undefined)?.user;
         if (account?.provider === "apple" && appleUser?.name) {

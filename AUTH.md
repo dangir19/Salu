@@ -55,6 +55,7 @@ You do **not** need Google or Apple to run `pnpm dev`, `pnpm test`, `pnpm lint`,
 | `AUTH_APPLE_KEY_ID` | Apple (alt) | Key ID for the `.p8` Sign in with Apple key. |
 | `AUTH_APPLE_PRIVATE_KEY` | Apple (alt) | Full `.p8` body. Use `\n` for newlines in env vars. |
 | `SALU_PROVIDER_EMAILS` | Provider workspace | Optional comma-separated emails (native, Google, or Apple) that open `/provider` as Tide & Tone until an approved Apply row exists. See [PROVIDER.md](./PROVIDER.md). |
+| `SALU_ADMIN_EMAILS` | Admin review queue | Comma-separated staff emails that may open `/admin` and call application list/status APIs. Production fails closed when empty. See [PROVIDERS.md](./PROVIDERS.md). |
 
 Copy `.env.example` to `.env` for Vite, or `.dev.vars` for Wrangler.
 
@@ -126,7 +127,7 @@ Until Google / Apple keys exist, `/signin` still renders; those buttons stay lab
 
 ## Development bypass
 
-Shown only when `NODE_ENV` is not `production`. Labeled **Development only · labeled bypass · not a live membership**. Production builds never register that provider. Native email/password stays registered in production.
+Shown only when `NODE_ENV` is not `production`. Labeled **Development only · labeled bypass · not a live membership**. `/admin` also offers **Continue as Salu admin** (`admin@localhost`) so local review still works without Google. Production builds never register those providers. Native email/password stays registered in production.
 
 ## Routes
 
@@ -134,11 +135,12 @@ Shown only when `NODE_ENV` is not `production`. Labeled **Development only · la
 | --- | --- |
 | `/signin` | Hospitality member sign-in / create account |
 | `/provider/signin` | Provider sign-in (same Auth.js; demo Tide & Tone in development) |
+| `/admin` | Staff review queue. Requires a signed-in email on `SALU_ADMIN_EMAILS`. |
 | `/api/auth/register` | Native account create (JSON). Then the client signs in through Auth.js. |
 | `/api/auth/*` | Auth.js (signin, callback, signout, csrf, session) including `credentials` |
-| `/api/me` | Combined member + provider session (Auth.js JWT + ChatGPT headers + provider flags) |
+| `/api/me` | Combined member + provider + admin session (Auth.js JWT + ChatGPT headers + provider/admin flags) |
 
-Logged-out visitors hitting the member shell (`/`, `/atlas`, `/explore`, …) see `/signin` first. Apply, provider workspace, and admin stay public. `/provider` shows the labeled demo plus application lookup until a provider session exists. Admin status writes are open unless `SALU_OPS_SECRET` is set. See [PROVIDERS.md](./PROVIDERS.md) and [PROVIDER.md](./PROVIDER.md).
+Logged-out visitors hitting the member shell (`/`, `/atlas`, `/explore`, …) see `/signin` first. Apply stays public. `/provider` shows the labeled demo plus application lookup until a provider session exists. `/admin` and the application list/status APIs require a signed-in session whose email is on `SALU_ADMIN_EMAILS`. Unauthenticated visitors are sent to `/signin`; signed-in non-staff see **Not authorized** and never receive queue data. Development can use the labeled **Continue as Salu admin** bypass (`admin@localhost`); production builds never register that provider. See [PROVIDERS.md](./PROVIDERS.md) and [PROVIDER.md](./PROVIDER.md).
 
 ## Member storage
 

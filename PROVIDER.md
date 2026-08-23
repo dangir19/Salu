@@ -8,7 +8,7 @@ Independent Miami providers can sign in to a workspace that is **distinct from m
 2. Create or sign in with **email and password**, or in development **Continue as Tide & Tone** — labeled demo provider, no Google app required.
 3. After approval, the same Auth.js email / Google / Apple account opens this workspace with `role=provider`.
 4. Incoming member bookings for that practice appear in the in-app queue (polls every few seconds).
-5. **Accept**, **decline**, or **propose a new time**.
+5. **Accept**, **decline**, or **propose a new time**. When you propose, the member accepts or declines from Appointments — not only through Atlas.
 6. On **Schedule**, see accepted jobs, **mark complete**, and **block off** a time.
 7. On **Payouts** (and the request-home card), **Set up payouts** — Stripe Connect Express for that `provider_accounts` practice.
 
@@ -26,6 +26,7 @@ Sessions are Auth.js JWTs. `/api/me` returns `{ member, provider, providers }`. 
 | Key | Required for | Notes |
 | --- | --- | --- |
 | `SALU_PROVIDER_EMAILS` | Production providers | Comma-separated emails (native, Google, or Apple) that should get `role=provider` and Tide & Tone coverage when they are not already an approved Apply person. |
+| `SALU_ADMIN_EMAILS` | BD review queue | Comma-separated staff emails for `/admin` and application list/status. Distinct from provider allowlist. See [PROVIDERS.md](./PROVIDERS.md). |
 
 Demo emails `tide@localhost` and `provider@localhost` always resolve to **Tide & Tone Recovery** (`practice_id` `tide-tone`). Production builds never show **Continue as Tide & Tone**.
 
@@ -37,7 +38,9 @@ When a signed-in member confirms a reservation (`POST /api/bookings` or Atlas `c
 | --- | --- | --- |
 | Accept | `accepted` + `provider_assignments` | **Provider accepted** |
 | Decline | `declined` | **Provider declined** (Credits stay until the member cancels) |
-| Propose time | `proposed` + `proposed_date` | **Provider proposed …** (member can still Move with Atlas) |
+| Propose time | `proposed` + `proposed_date` | **Provider proposed …** with **This time works** / **Not this time** on Appointments (Move with Atlas still available) |
+| Member accepts proposed time | `accepted` + assignment at the proposed slot | **Provider accepted** at the new time (Credits stay as already charged) |
+| Member declines proposed time | `open` (clears `proposed_date` and the assignment) | **Awaiting provider** at the original time (Credits stay until the member cancels) |
 | Member cancels | `cancelled` | Cancelled as today |
 
 Notification is the **in-app queue**. Email is optional and not wired.
@@ -59,6 +62,8 @@ The Worker intercepts `/api/provider` and `/api/provider/*` only — not `/api/p
 | `GET` | `/api/connect/me` | Auto-claims the signed-in practice (`provider_accounts.practice_id`). |
 | `POST` | `/api/connect/onboard` | Express Account Link. Defaults to the provider account practice. |
 | `POST` | `/api/bookings/complete` | Provider who owns that practice can complete an accepted job. |
+| `POST` | `/api/bookings/accept-proposal` | Member session. Accepts a `proposed` time; assignment uses that slot. |
+| `POST` | `/api/bookings/decline-proposal` | Member session. Returns the request to `open` at the original time. |
 
 `GET`/`POST` without a provider session return `{ source: "demo" }` (401 on writes).
 

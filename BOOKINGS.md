@@ -19,6 +19,8 @@ Member appointments persist on the server (D1) for signed-in sessions. Refreshin
 | `GET` | `/api/bookings` | Member’s reservations. |
 | `POST` | `/api/bookings` | Confirm. Body: `serviceId`, `date`, `mode`, optional `packageName` / `packageItem`. |
 | `POST` | `/api/bookings/reschedule` | Body: `id`, `date`. No Credit movement. |
+| `POST` | `/api/bookings/accept-proposal` | Body: `id`. Member accepts a provider-proposed time. Request becomes `accepted` at that slot. No Credit movement. |
+| `POST` | `/api/bookings/decline-proposal` | Body: `id`. Member declines a proposed time. Request returns to `open` / awaiting provider at the original time. Credits stay until cancel. |
 | `POST` | `/api/bookings/cancel` | Body: `id`. Restores Credits once when the booking had charged Credits. |
 | `POST` | `/api/bookings/complete` | Body: `id`. Marks the reservation completed and settles a Connect payout ([CONNECT.md](./CONNECT.md)). |
 
@@ -44,7 +46,7 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0006_credentials.sql
 
 `0002_bookings.sql` adds `bookings` (`member_id`, service snapshot, display `date`, `status`, `credits_charged`, optional package fields). Provider applications and Connect payouts are later migrations — see [PROVIDERS.md](./PROVIDERS.md) and [CONNECT.md](./CONNECT.md). No extra env keys are required for bookings.
 
-A confirmed reservation also opens an assignable **appointment request** for the catalog practice. Providers fill those in [PROVIDER.md](./PROVIDER.md).
+A confirmed reservation also opens an assignable **appointment request** for the catalog practice. Providers fill those in [PROVIDER.md](./PROVIDER.md). When a provider proposes a new time, the signed-in member accepts or declines it from Appointments (`POST /api/bookings/accept-proposal` or `/api/bookings/decline-proposal`) without opening Atlas. Accept confirms the proposed slot; decline reopens the request as awaiting provider. Credits do not move either way.
 
 You do **not** need live Stripe or Auth secrets to compile, lint, or test.
 

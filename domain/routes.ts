@@ -84,11 +84,11 @@ export const pageDescriptions: Record<Page,string>={
  "provider-apply":"Apply as a named independent provider — LMT or other solo licensed person — in Miami.",
  provider:"Accept appointment requests, set up Stripe Connect payouts, and look up your Apply status.",
  "provider-signin":"Sign in with email, or continue with Google or Apple, to fill member appointment requests.",
- admin:"Miami review queue for named providers, plus a labeled demo operating view of funds and volume.",
+ admin:"Staff-only Miami review queue for named providers, plus a labeled demo operating view of funds and volume.",
  signin:"Sign in with email, or continue with Google or Apple, to open your Salu membership.",
 };
 
-export const publicPages: Page[] = ["signin","provider-apply","provider","provider-signin","admin"];
+export const publicPages: Page[] = ["signin","provider-apply","provider","provider-signin"];
 
 export function isMemberShell(page: Page): boolean {
  return !publicPages.includes(page);

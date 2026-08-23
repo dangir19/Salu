@@ -1,5 +1,5 @@
 import type {ProviderLicenseType} from "../domain/types";
-import {opsAuthorized} from "./env";
+import {authorizeAdmin} from "./session";
 import {
   listApplications,
   listApplicationsForEmail,
@@ -107,9 +107,9 @@ function listFilterFrom(url: URL): ApplicationListFilter {
 }
 
 async function handleList(request: Request, url: URL, runtimeEnv: RuntimeEnv): Promise<Response> {
-  const auth = opsAuthorized(request, runtimeEnv);
+  const auth = await authorizeAdmin(request, runtimeEnv);
   if (!auth.ok) {
-    return json({source: "server", error: "Enter the Salu ops key to review applications.", opsOpen: false}, 401);
+    return json({source: "server", error: auth.error, opsOpen: false}, auth.status);
   }
   const applications = await listApplications(listFilterFrom(url));
   return json({
@@ -121,9 +121,9 @@ async function handleList(request: Request, url: URL, runtimeEnv: RuntimeEnv): P
 }
 
 async function handleStatus(request: Request, runtimeEnv: RuntimeEnv): Promise<Response> {
-  const auth = opsAuthorized(request, runtimeEnv);
+  const auth = await authorizeAdmin(request, runtimeEnv);
   if (!auth.ok) {
-    return json({source: "server", error: "Enter the Salu ops key to update status.", opsOpen: false}, 401);
+    return json({source: "server", error: auth.error, opsOpen: false}, auth.status);
   }
   let body: {id?: string; status?: string; reviewNote?: string; docsLicenseProof?: string; docsInsurance?: string};
   try {

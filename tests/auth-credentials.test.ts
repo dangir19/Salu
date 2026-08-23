@@ -95,6 +95,7 @@ test("keeps the credentials provider in production and hides the local preview",
   assert.ok(ids.includes("credentials"));
   assert.ok(!ids.includes("development"));
   assert.ok(!ids.includes("provider-development"));
+  assert.ok(!ids.includes("admin-development"));
 });
 
 test("register, login, and /api/me share the Auth.js JWT session", async () => {

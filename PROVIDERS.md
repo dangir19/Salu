@@ -11,7 +11,7 @@ This surface is apply + review only. Provider login and the request calendar liv
 | **Head of BD** | Outreach to named people, the Apply URL, interviews, collecting license/insurance **proof** offline, docs status, moving `submitted` → `under_review` → `approved` / `rejected`, Brickell / Miami Beach / Miami-Dade coverage, rate conversations | D1 schema, APIs, Explore merge, Stripe Connect implementation, credential-verification products |
 | **Eng** | `/apply` form, D1 `provider_applications`, `/api/providers/*`, admin filter + status + docs, approved individuals in the Explore catalog, labeled demo fallbacks, provider workspace ([PROVIDER.md](./PROVIDER.md)), Stripe Connect Express + transfers | Vendor outreach, interviewing, deciding who is approved, live license registries |
 
-Point independent providers at **https://joinsalu.com/apply** (or the Worker preview `/apply`). BD reviews them at `/admin`.
+Point independent providers at **https://joinsalu.com/apply** (or the Worker preview `/apply`). BD reviews them at `/admin` after signing in with an allowlisted staff email.
 
 ## Review fields (what BD listed)
 
@@ -34,8 +34,8 @@ License number and insurance checkbox are **self-reported**. They are not verifi
 | --- | --- |
 | `POST /api/providers/apply` | Public. Writes `submitted` into D1 when `DB` is bound, otherwise an in-process store (lost on Worker restart). |
 | `GET /api/providers/apply?email=` | Provider workspace lookup. Returns that person’s applications only. |
-| `GET /api/providers/applications` | Admin list. Filters: `status`, `neighborhood`, `mobile=yes\|no`, `licenseType`, `docs=missing_license\|missing_insurance\|complete`. |
-| `POST /api/providers/applications/status` | Admin status, BD note, and docs received/missing. |
+| `GET /api/providers/applications` | Admin list. **Signed-in allowlisted staff only.** Filters: `status`, `neighborhood`, `mobile=yes\|no`, `licenseType`, `docs=missing_license\|missing_insurance\|complete`. |
+| `POST /api/providers/applications/status` | Admin status, BD note, and docs received/missing. **Signed-in allowlisted staff only.** |
 | `GET /api/providers/catalog` | Approved **individuals** as Explore cards. Empty list keeps the labeled **demo catalog**. |
 
 The Worker intercepts `/api/providers` (same pattern as auth, payments, and bookings).
@@ -46,9 +46,28 @@ The Worker intercepts `/api/providers` (same pattern as auth, payments, and book
 
 Approved people appear on Explore as **independent providers**. Prototype portraits and “Tide & Tone” economics stay labeled **demo**.
 
-## Ops key
+## Staff auth
 
-When `SALU_OPS_SECRET` is set, list/status calls need the `x-salu-ops` header. The admin page stores what BD types in `sessionStorage`. **Not required** to compile, lint, or test — without the secret, the pipeline stays open so local review still works.
+`/admin` and the list/status APIs are **not public**. They require:
+
+1. A signed-in Auth.js session (the same `/api/me` session as membership — Google, Apple, ChatGPT headers, or the development bypass).
+2. That session email on `SALU_ADMIN_EMAILS` (comma-separated, case-insensitive).
+
+| Visitor | `/admin` | List / status APIs |
+| --- | --- | --- |
+| Signed out | Redirect to `/signin` — the live queue is never rendered | `401` — no application rows |
+| Signed in, email not on the allowlist | **Not authorized** (`403`) — no queue data | `403` — no application rows |
+| Signed in + allowlisted | Live review queue | `200` |
+
+Production fails closed: an empty `SALU_ADMIN_EMAILS` means **nobody** can read or update the live queue. Set Daniel / Head of BD emails on the Worker before they review production Apply submissions.
+
+Development has a labeled **Continue as Salu admin** path (`admin@localhost`), same idea as Tide & Tone. Production builds never register that provider and never treat `admin@localhost` as staff.
+
+The **APPROVAL QUEUE · DEMO** block on `/admin` is fabricated walkthrough names (Sofia Alvarez, Mateo Ruiz, Elena Torres). It is not the D1 pipeline. The **LIVE REVIEW QUEUE** is the real applicant list and stays gated even in local previews.
+
+### Optional ops header
+
+When `SALU_OPS_SECRET` is set, list/status also need the `x-salu-ops` header after the session + allowlist check. The admin page stores what BD types in `sessionStorage`. This is an extra lock, not a substitute for sign-in. **Not required** to compile, lint, or test.
 
 ## D1 binding
 

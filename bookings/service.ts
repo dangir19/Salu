@@ -59,6 +59,17 @@ function sortBookings(rows: Booking[]): Booking[] {
   return [...rows].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
 }
 
+function wrapProviderError(error: unknown, fallback: string): never {
+  if (error instanceof BookingError) throw error;
+  if (error instanceof Error) {
+    const status = "status" in error && typeof (error as {status?: unknown}).status === "number"
+      ? (error as {status: number}).status
+      : 400;
+    throw new BookingError(error.message || fallback, status);
+  }
+  throw new BookingError(fallback);
+}
+
 async function attachRequest(booking: Booking): Promise<Booking> {
   try {
     const provider = await import("../provider/service");
@@ -221,6 +232,76 @@ export async function createMemberBooking(input: {
   await persistBooking(booking);
   const withRequest = await attachRequest(booking);
   return {booking: withRequest, creditsApplied, availableCredits};
+}
+
+export async function acceptProposedBookingTime(input: {
+  member: Member;
+  bookingId: string;
+}): Promise<{booking: Booking; creditsApplied: false; availableCredits: number}> {
+  const booking = await storedBooking(input.bookingId);
+  if (!booking || booking.memberId !== input.member.id) {
+    throw new BookingError("That reservation is not on your calendar.", 404);
+  }
+  if (booking.status !== "confirmed" && booking.status !== "held") {
+    throw new BookingError("Only upcoming reservations can accept a proposed time.");
+  }
+
+  const provider = await import("../provider/service");
+  const request = await provider.requestForBooking(booking.id);
+  if (!request || request.status !== "proposed" || !request.proposedDate) {
+    throw new BookingError("There is no proposed time waiting on this reservation.");
+  }
+
+  try {
+    await provider.acceptProposedTimeForMember({memberId: input.member.id, bookingId: booking.id});
+  } catch (error) {
+    wrapProviderError(error, "That proposed time could not be accepted.");
+  }
+
+  const next: Booking = {
+    ...booking,
+    date: request.proposedDate,
+    updatedAt: new Date().toISOString(),
+  };
+  await persistBooking(next);
+  const billing = await import("../payments/ledger").then((mod) => mod.getMemberBilling(input.member));
+  return {
+    booking: await attachRequest(next),
+    creditsApplied: false,
+    availableCredits: billing.wallet.availableCredits,
+  };
+}
+
+export async function declineProposedBookingTime(input: {
+  member: Member;
+  bookingId: string;
+}): Promise<{booking: Booking; creditsApplied: false; availableCredits: number}> {
+  const booking = await storedBooking(input.bookingId);
+  if (!booking || booking.memberId !== input.member.id) {
+    throw new BookingError("That reservation is not on your calendar.", 404);
+  }
+  if (booking.status !== "confirmed" && booking.status !== "held") {
+    throw new BookingError("Only upcoming reservations can decline a proposed time.");
+  }
+
+  const provider = await import("../provider/service");
+  const request = await provider.requestForBooking(booking.id);
+  if (!request || request.status !== "proposed") {
+    throw new BookingError("There is no proposed time waiting on this reservation.");
+  }
+
+  try {
+    await provider.declineProposedTimeForMember({memberId: input.member.id, bookingId: booking.id});
+  } catch (error) {
+    wrapProviderError(error, "That proposed time could not be declined.");
+  }
+
+  const billing = await import("../payments/ledger").then((mod) => mod.getMemberBilling(input.member));
+  return {
+    booking: await attachRequest(booking),
+    creditsApplied: false,
+    availableCredits: billing.wallet.availableCredits,
+  };
 }
 
 export async function rescheduleMemberBooking(input: {

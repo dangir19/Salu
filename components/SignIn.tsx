@@ -4,7 +4,7 @@ import Link from "next/link";
 import {useState, type FormEvent} from "react";
 import type {AuthSurface} from "../auth/env";
 
-type OAuthId = "google" | "apple" | "development" | "provider-development";
+type OAuthId = "google" | "apple" | "development" | "provider-development" | "admin-development";
 type BusyId = OAuthId | "credentials";
 type AccountMode = "signin" | "create";
 
@@ -18,6 +18,7 @@ export default function SignIn({
   const [busy, setBusy] = useState<BusyId | null>(null);
   const [notice, setNotice] = useState(credentialsErrorFromSearch);
   const safeReturn = safePath(returnTo, "/", "/signin");
+  const staffGate = safeReturn === "/admin" || safeReturn.startsWith("/admin/");
 
   return (
     <div className="salu-app signin-page">
@@ -28,19 +29,28 @@ export default function SignIn({
         <small>Miami · in-home wellness, beautifully handled.</small>
       </div>
       <section className="signin-card" id="signin-card">
-        <span className="eyebrow">MEMBERS</span>
-        <h1>Come in. We’ll take it from here.</h1>
+        <span className="eyebrow">{staffGate ? "SALU STAFF" : "MEMBERS"}</span>
+        <h1>{staffGate ? "Staff sign-in for the review queue." : "Come in. We’ll take it from here."}</h1>
         <NativeAccountForm
           kind="member"
           busy={busy}
           setBusy={setBusy}
           setNotice={setNotice}
           returnTo={safeReturn}
-          signInCopy="Create an account with email, or sign back in. Atlas, your Credits and Miami bookings stay with your membership."
-          createCopy="A few details and you’re in. Atlas, Credits and Miami bookings will stay with this membership."
+          signInCopy={
+            staffGate
+              ? "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
+              : "Create an account with email, or sign back in. Atlas, your Credits and Miami bookings stay with your membership."
+          }
+          createCopy={
+            staffGate
+              ? "Create the staff email you’ll use on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
+              : "A few details and you’re in. Atlas, Credits and Miami bookings will stay with this membership."
+          }
         />
         <OAuthButtons
           kind="member"
+          staffGate={staffGate}
           surface={surface}
           busy={busy}
           start={(provider, configured, missing) =>
@@ -229,11 +239,13 @@ function NativeAccountForm({
 
 function OAuthButtons({
   kind,
+  staffGate = false,
   surface,
   busy,
   start,
 }: {
   kind: "member" | "provider";
+  staffGate?: boolean;
   surface: AuthSurface;
   busy: BusyId | null;
   start: (provider: OAuthId, configured: boolean, missing: string) => void;
@@ -273,7 +285,7 @@ function OAuthButtons({
         <AppleMark />
         {busy === "apple" ? "Opening Apple…" : surface.apple ? "Continue with Apple" : "Continue with Apple · coming soon"}
       </button>
-      {surface.development && kind === "member" && (
+      {surface.development && kind === "member" && !staffGate && (
         <button
           type="button"
           className="signin-dev"
@@ -282,6 +294,17 @@ function OAuthButtons({
         >
           {busy === "development" ? "Opening preview…" : "Continue with a local preview"}
           <small>Development only · labeled bypass · not a live membership</small>
+        </button>
+      )}
+      {surface.development && kind === "member" && staffGate && (
+        <button
+          type="button"
+          className="signin-dev"
+          disabled={busy !== null}
+          onClick={() => start("admin-development", true, "")}
+        >
+          {busy === "admin-development" ? "Opening admin preview…" : "Continue as Salu admin"}
+          <small>Development only · labeled local review · production never exposes the live queue</small>
         </button>
       )}
       {surface.development && kind === "provider" && (
@@ -413,6 +436,38 @@ export function AuthLoading() {
     <div className="salu-app signin-page signin-loading">
       <span className="wordmark">salu<span>°</span></span>
       <p>Preparing your membership…</p>
+    </div>
+  );
+}
+
+export function AdminForbidden({
+  go,
+  signOut,
+}: {
+  go: (page: "home") => void;
+  signOut: () => void | Promise<void>;
+}) {
+  return (
+    <div className="salu-app signin-page">
+      <a className="skip-link" href="#signin-card">Skip to notice</a>
+      <div className="signin-brand">
+        <span className="wordmark">salu<span>°</span></span>
+        <p>Your health concierge.</p>
+        <small>Miami · staff review is allowlisted.</small>
+      </div>
+      <section className="signin-card" id="signin-card">
+        <span className="eyebrow">SALU STAFF</span>
+        <h1>Not authorized.</h1>
+        <p className="signin-copy">
+          This review queue is only for authorized Salu staff. Your signed-in account cannot see or change applications.
+        </p>
+        <button type="button" className="signin-google" onClick={() => go("home")}>
+          Back to Salu
+        </button>
+        <button type="button" className="signin-apple" onClick={signOut}>
+          Sign out
+        </button>
+      </section>
     </div>
   );
 }
