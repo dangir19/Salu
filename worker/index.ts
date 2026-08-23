@@ -14,6 +14,11 @@ interface Env {
   AUTH_APPLE_TEAM_ID?: string;
   AUTH_APPLE_KEY_ID?: string;
   AUTH_APPLE_PRIVATE_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_PUBLISHABLE_KEY?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_GOLD_PRICE_ID?: string;
+  STRIPE_PLATINUM_PRICE_ID?: string;
   IMAGES: {
     input(stream: ReadableStream): {
       transform(options: Record<string, unknown>): {
@@ -41,6 +46,11 @@ const worker = {
     if (url.pathname === "/api/me" || url.pathname.startsWith("/api/auth")) {
       const {handleAuthFetch} = await import("../auth/handlers");
       return handleAuthFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
+    if (url.pathname.startsWith("/api/payments") || url.pathname.startsWith("/api/stripe")) {
+      const {handlePaymentsFetch} = await import("../payments/handlers");
+      return handlePaymentsFetch(request, env as unknown as Record<string, string | undefined>);
     }
 
     if (url.pathname === "/_vinext/image") {

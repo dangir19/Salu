@@ -1,32 +1,29 @@
-# Next PR: Stripe Billing and Connect
+# Next PR: Stripe Connect (provider payouts)
 
-This release stops pretending a Visa is on file. Profile billing reads `PaymentsPort.getDefaultPaymentMethod()`, which currently returns `null`.
+Membership Billing and Credit top-ups are in this release. See **[STRIPE.md](./STRIPE.md)** for Dashboard products, the `joinsalu.com` webhook, and the `STRIPE_*` secrets.
+
+This file is only the **Connect** follow-up. Do **not** treat wallet contributions as Salu revenue. Credits are customer liabilities; Salu revenue is marketplace commission (`PlatformCommission`).
 
 ## Already in the tree
 
-- `domain/types.ts` — `PaymentMethod`, `PaymentsPort`
-- `domain/payments.ts` — null implementation + placeholder copy
-- Profile UI — “No payment method on file” / “Stripe Billing is not connected yet”
-
-Do **not** treat wallet contributions as Salu revenue. Credits are customer liabilities; Salu revenue is marketplace commission (`PlatformCommission`).
+- Stripe Checkout for Gold ($200/mo) and Platinum ($500/mo)
+- Stripe Checkout for one-time Credit top-ups (100 / 200 / 500)
+- Webhooks: `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`, `charge.refunded`
+- D1 `wallets`, `credit_transactions`, `stripe_events` plus `members.stripe_customer_id` / `stripe_subscription_id`
+- Profile billing reads `/api/payments/me` (card last4 when Stripe has one)
+- Demo fallback when `STRIPE_SECRET_KEY` is missing
 
 ## Following PR should add
 
-1. **Stripe Billing** for Gold ($200/mo) and Platinum ($500/mo) Credit funding.
-2. **Stripe Checkout / Payment Element** for one-time Credit top-ups.
-3. **Stripe Connect** for provider payouts, keeping gross member spend, commission, and net payout separate (`ProviderPayout`).
-4. Webhooks: `invoice.paid`, `customer.subscription.updated`, `account.updated`.
-5. Persist `stripeCustomerId` / `stripeSubscriptionId` on the member row (D1), not in localStorage.
+1. **Stripe Connect** for provider payouts, keeping gross member spend, commission, and net payout separate (`ProviderPayout`).
+2. Webhooks: `account.updated`, plus transfer/payout events.
+3. `STRIPE_CONNECT_CLIENT_ID` and connected-account onboarding for approved providers.
+4. Booking persistence that can attach a `PlatformCommission` when an appointment completes (out of scope here).
 
 ## Suggested env keys (do not add until that PR)
 
 ```text
-STRIPE_SECRET_KEY=
-STRIPE_PUBLISHABLE_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_GOLD_PRICE_ID=
-STRIPE_PLATINUM_PRICE_ID=
 STRIPE_CONNECT_CLIENT_ID=
 ```
 
-Create the Stripe account and products when you are ready to take live cards — not required for this auth PR.
+Create connected accounts when you are ready to pay providers — not required for membership or Credit funding.
