@@ -14,7 +14,7 @@ pnpm dev
 
 No Google or Apple secrets are required to compile, lint, or test. In development, sign-in offers a labeled **local preview** bypass. Open the local URL printed by the development server.
 
-To enable real Google / Apple member login, follow **[AUTH.md](./AUTH.md)** (Google Cloud OAuth client, Apple Services ID, `AUTH_*` env on the Cloudflare Worker). Stripe Billing is **not** in this release — see **[NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md)**.
+To enable real Google / Apple member login, follow **[AUTH.md](./AUTH.md)** (Google Cloud OAuth client, Apple Services ID, `AUTH_*` env on the Cloudflare Worker). To take live cards for Gold / Platinum and Credit top-ups, follow **[STRIPE.md](./STRIPE.md)**. Stripe Connect (provider payouts) is **not** in this release — see **[NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md)**.
 
 Production hosting is a Cloudflare Worker named `salu`, deployed by GitHub Actions on every push to `main`. See **[DEPLOY.md](./DEPLOY.md)** for token permissions and secrets. Do not move **joinsalu.com** off Codex Sites until **[CUTOVER.md](./CUTOVER.md)**.
 
@@ -31,7 +31,7 @@ pnpm test
 
 - Premium hospitality-led landing experience with Member (free, standard prices), Gold ($200/month, 10% off) and Platinum ($500/month, 20% off)
 - Automatic month-to-month Credit rollover for Gold and Platinum, with no Credit loss
-- Mock onboarding and funded Salu Credit wallet
+- Stripe Checkout for Gold / Platinum and Credit top-ups when `STRIPE_*` keys are present; labeled demo wallet without secrets
 - Persistent Ask Atlas action across every member screen
 - Atlas conversation with deterministic education, escalation and booking responses
 - Credit deduction, transaction history and package purchase/entitlements
@@ -53,30 +53,34 @@ app/
   [[...slug]]/page.tsx Shareable member routes + session hand-off
   api/auth            Auth.js Google / Apple / development handlers
   api/me              Combined member session
+  api/payments        Checkout, portal, and wallet snapshot
+  api/stripe/webhook  Signed Stripe events → membership + Credits
   chatgpt-auth.ts     OpenAI Sites header identity
 components/
   SaluApp.tsx         Member shell (gated on a real session)
   SignIn.tsx          Hospitality Google / Apple sign-in
 auth/                 Auth.js config, env stubs, member mapping
+payments/             Stripe env, Checkout, webhook ledger
 domain/
   mock-data.ts        Miami services, packages, bookings and Atlas fixtures
   types.ts            Member, wallet, and payments-port contracts
-  payments.ts         Stripe hooks for the following PR
-db/                   D1/Drizzle members + member_accounts
-worker/               Cloudflare entry; /api/auth and /api/me intercept
+  payments.ts         Browser placeholder until /api/payments/me returns a card
+db/                   D1/Drizzle members, wallets, credit ledger
+worker/               Cloudflare entry; auth + payments intercept
 wrangler.jsonc        Production Worker `salu` (CI deploy; no joinsalu.com route)
 .github/workflows/    Verify on PRs; deploy to Workers on `main`
 DEPLOY.md / CUTOVER.md Cloudflare token, secrets, and DNS switch
 .openai/hosting.json  Local / Codex Sites metadata + D1 binding `DB`
-tests/                Render/build, auth identity, and deploy-config checks
+tests/                Render/build, auth identity, payments, and deploy-config checks
 ```
 
-Bookings, Credits and package sessions still survive local review in browser storage. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue.
+Bookings and package sessions still survive local review in browser storage. When Stripe keys are present, membership and Credit funding persist on D1 via webhooks. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue.
 
 ## Production next steps
 
-1. Finish D1 migrations, row-level access, and audit logging for Credits, bookings and entitlements (members table is in place).
-2. Connect Stripe Billing for recurring wallet funding and Stripe Connect for provider payouts; recognize commissions separately from customer wallet liabilities. See `NEXT_PAYMENTS.md`.
+1. Finish D1 migrations, row-level access, and audit logging for bookings and package entitlements (members + Credit ledger are in place).
+2. Apply `drizzle/0001_payments.sql` in Cloudflare D1 if you want the ledger tables before the first webhook; see `STRIPE.md`.
+3. Connect Stripe Connect for provider payouts; recognize commissions separately from customer wallet liabilities. See `NEXT_PAYMENTS.md`.
 4. Implement a provider credential-review workflow; never treat prototype fields as verified.
 5. Connect a real language model through a guarded Atlas orchestration layer with structured discovery, availability, booking, rescheduling and cancellation tools.
 6. Add integration consent, token storage and official APIs for Runna/Strava/etc. only after partnership and privacy review.

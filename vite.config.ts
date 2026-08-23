@@ -34,6 +34,11 @@ function localAuthVars() {
     AUTH_APPLE_TEAM_ID: process.env.AUTH_APPLE_TEAM_ID ?? "",
     AUTH_APPLE_KEY_ID: process.env.AUTH_APPLE_KEY_ID ?? "",
     AUTH_APPLE_PRIVATE_KEY: process.env.AUTH_APPLE_PRIVATE_KEY ?? "",
+    STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "",
+    STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY ?? "",
+    STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET ?? "",
+    STRIPE_GOLD_PRICE_ID: process.env.STRIPE_GOLD_PRICE_ID ?? "",
+    STRIPE_PLATINUM_PRICE_ID: process.env.STRIPE_PLATINUM_PRICE_ID ?? "",
   };
 }
 

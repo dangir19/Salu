@@ -12,6 +12,7 @@ const signIn = await readFile(new URL("../components/SignIn.tsx", import.meta.ur
 const app = await readFile(new URL("../components/SaluApp.tsx", import.meta.url), "utf8");
 const authMd = await readFile(new URL("../AUTH.md", import.meta.url), "utf8");
 const payMd = await readFile(new URL("../NEXT_PAYMENTS.md", import.meta.url), "utf8");
+const stripeMd = await readFile(new URL("../STRIPE.md", import.meta.url), "utf8");
 const example = await readFile(new URL("../.env.example", import.meta.url), "utf8");
 
 test("documents Auth.js and the exact env keys Daniel must set", () => {
@@ -56,8 +57,9 @@ test("maps sessions onto the Member domain contract and D1 tables", () => {
   assert.match(schema, /member_accounts/);
   assert.match(payments, /getDefaultPaymentMethod/);
   assert.match(payments, /return null/);
-  assert.match(payMd, /Stripe Billing/);
   assert.match(payMd, /Stripe Connect/);
+  assert.match(stripeMd, /Stripe Billing/);
+  assert.match(stripeMd, /joinsalu.com\/api\/stripe\/webhook/);
 });
 
 test("gates the member shell and stops pretending a Visa is live", () => {
