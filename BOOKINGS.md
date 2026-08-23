@@ -47,4 +47,4 @@ You do **not** need live Stripe or Auth secrets to compile, lint, or test.
 - Provider and admin **calendars** stay prototype / local. Head of BD owns the Miami supplier pipeline (outreach, interviews, status); eng owns persistence and APIs — see [PROVIDERS.md](./PROVIDERS.md).
 - Availability inventory is the Miami catalog (`domain/mock-data.ts`), not a held-slot table. Approved individual providers can appear in Explore; the mock catalog stays a labeled **demo**.
 - Stripe Connect / `ProviderPayout` is still the next payments step ([NEXT_PAYMENTS.md](./NEXT_PAYMENTS.md)).
-- Atlas LLM, Cloudflare DNS cutover, and live credential-verification integrations are unchanged.
+- Atlas now books through this API; the optional language-model key, Cloudflare DNS cutover, and live credential-verification integrations are unchanged. See [ATLAS.md](./ATLAS.md).

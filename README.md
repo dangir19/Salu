@@ -33,7 +33,7 @@ pnpm test
 - Automatic month-to-month Credit rollover for Gold and Platinum, with no Credit loss
 - Stripe Checkout for Gold / Platinum and Credit top-ups when `STRIPE_*` keys are present; labeled demo wallet without secrets
 - Persistent Ask Atlas action across every member screen
-- Atlas conversation with deterministic education, escalation and booking responses
+- Atlas conversation with a guarded tool layer: discover services, check catalog windows, create bookings through `/api/bookings`, and show a confirmation card that opens Appointments
 - Credit deduction, transaction history and package purchase/entitlements
 - Searchable Miami marketplace across at-home, virtual, hotel and provider-location modes
 - Service and provider details, time selection, checkout, rescheduling and cancellation
@@ -55,6 +55,7 @@ app/
   api/me              Combined member session
   api/payments        Checkout, portal, and wallet snapshot
   api/bookings        Member create / list / reschedule / cancel
+  api/atlas           Concierge turn: tools, safety, optional OpenAI
   api/providers       Apply, catalog, and admin pipeline
   api/stripe/webhook  Signed Stripe events → membership + Credits
   chatgpt-auth.ts     OpenAI Sites header identity
@@ -68,14 +69,16 @@ domain/
   types.ts            Member, wallet, and payments-port contracts
   payments.ts         Browser placeholder until /api/payments/me returns a card
 bookings/             Member booking service, catalog prices, handlers
+atlas/                Deterministic planner, tools, optional OpenAI, handlers
 providers/            Application service, Miami catalog mapping, handlers
 db/                   D1/Drizzle members, wallets, credit ledger, bookings, applications
-worker/               Cloudflare entry; auth + payments + bookings + providers intercept
+worker/               Cloudflare entry; auth + payments + bookings + Atlas + providers intercept
 wrangler.jsonc        Production Worker `salu` (CI deploy; no joinsalu.com route)
 .github/workflows/    Verify on PRs; deploy to Workers on `main`
 DEPLOY.md / CUTOVER.md Cloudflare token, secrets, and DNS switch
 .openai/hosting.json  Local / Codex Sites metadata + D1 binding `DB`
-tests/                Render/build, auth identity, payments, deploy-config, booking, and provider API checks
+ATLAS.md              Concierge tools, safety, and optional language-model path
+tests/                Render/build, auth identity, payments, deploy-config, booking, provider, and Atlas tool checks
 ```
 
 Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin`. Approved individuals appear in Explore; the mock catalog stays a labeled **demo**. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)** and **[PROVIDERS.md](./PROVIDERS.md)**.
@@ -86,7 +89,7 @@ Signed-in member appointments persist in D1 (`/api/bookings`) and survive refres
 2. Apply `drizzle/0001_payments.sql`, `drizzle/0002_bookings.sql`, and `drizzle/0003_provider_applications.sql` in Cloudflare D1 if you want the tables before the first webhook, reservation, or application; see `STRIPE.md`, `BOOKINGS.md`, and `PROVIDERS.md`.
 3. Connect Stripe Connect for provider payouts; recognize commissions separately from customer wallet liabilities. See `NEXT_PAYMENTS.md`.
 4. Add live license / insurance verification integrations; never treat Apply attestations or prototype fields as verified.
-5. Connect a real language model through a guarded Atlas orchestration layer with structured discovery, availability, booking, rescheduling and cancellation tools.
+5. Optional: set `OPENAI_API_KEY` so Atlas can use a language model on top of the same discover / availability / booking tools. Reschedule and cancel from chat are still follow-ups.
 6. Add integration consent, token storage and official APIs for Runna/Strava/etc. only after partnership and privacy review.
 7. Add provider onboarding, offer management, lab-order eligibility, and tightly bounded GLP-1-adjacent education without medication prescribing.
 8. Add automated unit, integration, accessibility and end-to-end tests plus observability.

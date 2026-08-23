@@ -63,5 +63,6 @@ export type Promotion={id:ID;title:string;discountPercent:number;startsAt:string
 export type ConnectedApp={id:ID;memberId:ID;provider:"runna"|"strava"|"apple_health"|"garmin"|"oura"|"whoop"|"calendar";status:"demo"|"connected"|"disconnected"};
 export type TrainingPlan={id:ID;memberId:ID;goal:string;raceDate:string;weeklyMileage:number;phase:string;upcomingWorkouts:{date:string;label:string}[]};
 export type AtlasConversation={id:ID;memberId:ID;messages:{role:"member"|"atlas";content:string;createdAt:string}[]};
-export type AtlasRecommendation={id:ID;conversationId:ID;serviceIds:ID[];rationale:string;safetyEscalation?:string};
+export type AtlasToolName="discover_services"|"check_availability"|"create_booking";
+export type AtlasRecommendation={id:ID;conversationId:ID;serviceIds:ID[];rationale:string;safetyEscalation?:string;bookingId?:ID};
 export type TravelProfile={id:ID;memberId:ID;destination:string;hotel:string;arrival:string;departure:string;goal:string;radiusMiles:number;preferredTime:string};

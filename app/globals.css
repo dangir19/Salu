@@ -105,6 +105,15 @@ button{cursor:pointer;color:inherit}
 .bubble.member p{background:var(--forest);color:white;border-radius:16px 4px 16px 16px}
 .atlas-options{margin:28px 0 0 50px}
 .atlas-options>span{font-size:9px;letter-spacing:.15em;color:var(--muted)}
+.atlas-confirm-card{margin:12px 0 0 50px;background:white;border:1px solid var(--line);border-radius:16px;padding:16px 18px;display:grid;gap:6px;max-width:420px}
+.atlas-confirm-card small{font-size:9px;letter-spacing:.15em;color:var(--muted)}
+.atlas-confirm-card b{font:22px var(--serif)}
+.atlas-confirm-card p{margin:0;color:var(--muted);font-size:13px}
+.atlas-confirm-card button{border:0;background:var(--sage);border-radius:8px;padding:8px 12px;width:max-content;font-weight:750;margin-top:6px}
+.atlas-windows{margin:16px 0 0 50px;display:flex;flex-wrap:wrap;gap:8px}
+.atlas-windows>span{width:100%;font-size:9px;letter-spacing:.15em;color:var(--muted)}
+.atlas-windows button{border:1px solid var(--line);background:white;border-radius:999px;padding:8px 12px;font-size:12px}
+.bubble.thinking p{opacity:.72}
 .compact-service{display:flex;align-items:center;justify-content:space-between;gap:20px;background:white;border:1px solid var(--line);border-radius:12px;padding:14px;margin-top:9px}
 .compact-service>div{display:flex;flex-direction:column;gap:4px}
 .compact-service small,.compact-service span{font-size:10px;color:var(--muted)}
