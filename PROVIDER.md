@@ -26,6 +26,7 @@ Sessions are Auth.js JWTs. `/api/me` returns `{ member, provider, providers }`. 
 | Key | Required for | Notes |
 | --- | --- | --- |
 | `SALU_PROVIDER_EMAILS` | Production Google/Apple providers | Comma-separated emails that should get `role=provider` and Tide & Tone coverage when they are not already an approved Apply person. |
+| `SALU_ADMIN_EMAILS` | BD review queue | Comma-separated staff emails for `/admin` and application list/status. Distinct from provider allowlist. See [PROVIDERS.md](./PROVIDERS.md). |
 
 Demo emails `tide@localhost` and `provider@localhost` always resolve to **Tide & Tone Recovery** (`practice_id` `tide-tone`). Production builds never show **Continue as Tide & Tone**.
 

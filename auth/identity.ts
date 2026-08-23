@@ -7,6 +7,11 @@ export type MemberSession = {
   memberSince: string;
 };
 
+export type AdminSession = {
+  role: "admin";
+  email: string;
+};
+
 export function memberInitials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   if (parts.length >= 2) {

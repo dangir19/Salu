@@ -14,7 +14,7 @@ export async function handleAuthFetch(request: Request, runtimeEnv: RuntimeEnv =
   applyAuthEnvToProcess(env);
 
   if (url.pathname === "/api/me") {
-    return Response.json(await getMePayload(request));
+    return Response.json(await getMePayload(request, undefined, runtimeEnv));
   }
 
   const action = url.pathname.split("/api/auth/")[1]?.split("/")[0];

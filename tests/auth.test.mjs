@@ -31,7 +31,7 @@ test("documents Auth.js and the exact env keys Daniel must set", () => {
   ]) {
     assert.match(authMd, new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
-  for (const key of ["AUTH_SECRET", "AUTH_GOOGLE_ID", "AUTH_APPLE_ID"]) {
+  for (const key of ["AUTH_SECRET", "AUTH_GOOGLE_ID", "AUTH_APPLE_ID", "SALU_ADMIN_EMAILS"]) {
     assert.match(example, new RegExp(key));
   }
 });

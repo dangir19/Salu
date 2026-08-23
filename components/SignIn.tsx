@@ -4,7 +4,7 @@ import Link from "next/link";
 import {useState} from "react";
 import type {AuthSurface} from "../auth/env";
 
-type ProviderId = "google" | "apple" | "development";
+type ProviderId = "google" | "apple" | "development" | "admin-development";
 
 export default function SignIn({
   returnTo = "/",
@@ -16,6 +16,7 @@ export default function SignIn({
   const [busy, setBusy] = useState<ProviderId | null>(null);
   const [notice, setNotice] = useState("");
   const safeReturn = returnTo.startsWith("/") && !returnTo.startsWith("//") ? returnTo : "/";
+  const staffGate = safeReturn === "/admin" || safeReturn.startsWith("/admin/");
 
   const start = async (provider: ProviderId, configured: boolean, missing: string) => {
     if (!configured) {
@@ -51,10 +52,12 @@ export default function SignIn({
         <small>Miami · in-home wellness, beautifully handled.</small>
       </div>
       <section className="signin-card" id="signin-card">
-        <span className="eyebrow">MEMBERS</span>
-        <h1>Come in. We’ll take it from here.</h1>
+        <span className="eyebrow">{staffGate ? "SALU STAFF" : "MEMBERS"}</span>
+        <h1>{staffGate ? "Staff sign-in for the review queue." : "Come in. We’ll take it from here."}</h1>
         <p className="signin-copy">
-          Continue with the account you already use. Atlas, your Credits and Miami bookings stay with your membership.
+          {staffGate
+            ? "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the account on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
+            : "Continue with the account you already use. Atlas, your Credits and Miami bookings stay with your membership."}
         </p>
         <button
           type="button"
@@ -95,6 +98,17 @@ export default function SignIn({
           >
             {busy === "development" ? "Opening preview…" : "Continue with a local preview"}
             <small>Development only · labeled bypass · not a live membership</small>
+          </button>
+        )}
+        {surface.development && staffGate && (
+          <button
+            type="button"
+            className="signin-dev"
+            disabled={busy !== null}
+            onClick={() => start("admin-development", true, "")}
+          >
+            {busy === "admin-development" ? "Opening admin preview…" : "Continue as Salu admin"}
+            <small>Development only · labeled local review · production never exposes the live queue</small>
           </button>
         )}
         {notice && <p className="signin-notice" role="status">{notice}</p>}
@@ -244,6 +258,38 @@ export function AuthLoading() {
     <div className="salu-app signin-page signin-loading">
       <span className="wordmark">salu<span>°</span></span>
       <p>Preparing your membership…</p>
+    </div>
+  );
+}
+
+export function AdminForbidden({
+  go,
+  signOut,
+}: {
+  go: (page: "home") => void;
+  signOut: () => void | Promise<void>;
+}) {
+  return (
+    <div className="salu-app signin-page">
+      <a className="skip-link" href="#signin-card">Skip to notice</a>
+      <div className="signin-brand">
+        <span className="wordmark">salu<span>°</span></span>
+        <p>Your health concierge.</p>
+        <small>Miami · staff review is allowlisted.</small>
+      </div>
+      <section className="signin-card" id="signin-card">
+        <span className="eyebrow">SALU STAFF</span>
+        <h1>Not authorized.</h1>
+        <p className="signin-copy">
+          This review queue is only for authorized Salu staff. Your signed-in account cannot see or change applications.
+        </p>
+        <button type="button" className="signin-google" onClick={() => go("home")}>
+          Back to Salu
+        </button>
+        <button type="button" className="signin-apple" onClick={signOut}>
+          Sign out
+        </button>
+      </section>
     </div>
   );
 }
