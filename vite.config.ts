@@ -1,6 +1,6 @@
 import vinext from "vinext";
 import { readFile } from "node:fs/promises";
-import { defineConfig } from "vite";
+import { defineConfig, type PluginOption } from "vite";
 
 const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
@@ -47,7 +47,7 @@ export default defineConfig(async () => {
   // Wrangler snapshots its log path while the Cloudflare plugin is imported.
   const { cloudflare } = await import("@cloudflare/vite-plugin");
 
-  const plugins = [vinext()];
+  const plugins: PluginOption[] = [vinext()];
 
   if (useSitesPlugin) {
     const { sites } = await import("./build/sites-vite-plugin");

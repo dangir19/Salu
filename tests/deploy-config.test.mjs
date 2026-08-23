@@ -7,18 +7,21 @@ const workflow=await readFile(new URL("../.github/workflows/deploy.yml",import.m
 const vite=await readFile(new URL("../vite.config.ts",import.meta.url),"utf8");
 const deployDocs=await readFile(new URL("../DEPLOY.md",import.meta.url),"utf8");
 const cutover=await readFile(new URL("../CUTOVER.md",import.meta.url),"utf8");
+const wranglerJson=JSON.parse(wrangler.replace(/\/\*[\s\S]*?\*\//g,"").replace(/^\s*\/\/.*$/gm,""));
 
 test("ships a production Worker config that lets vinext own member routes",()=>{
- assert.match(wrangler,/"name":\s*"salu"/);
- assert.match(wrangler,/"main":\s*"\.\/worker\/index\.ts"/);
- assert.match(wrangler,/"compatibility_flags":\s*\[["']nodejs_compat["']\]/);
- assert.match(wrangler,/"not_found_handling":\s*"none"/);
- assert.match(wrangler,/"binding":\s*"ASSETS"/);
- assert.match(wrangler,/"binding":\s*"IMAGES"/);
- assert.match(wrangler,/"workers_dev":\s*true/);
- assert.match(wrangler,/"keep_vars":\s*true/);
- assert.doesNotMatch(wrangler,/joinsalu\.com/);
- assert.doesNotMatch(wrangler,/single-page-application/);
+ assert.equal(wranglerJson.name,"salu");
+ assert.equal(wranglerJson.main,"./worker/index.ts");
+ assert.deepEqual(wranglerJson.compatibility_flags,["nodejs_compat"]);
+ assert.equal(wranglerJson.assets.not_found_handling,"none");
+ assert.equal(wranglerJson.assets.binding,"ASSETS");
+ assert.equal(wranglerJson.images.binding,"IMAGES");
+ assert.equal(wranglerJson.workers_dev,true);
+ assert.equal(wranglerJson.keep_vars,true);
+ assert.equal(wranglerJson.routes,undefined);
+ assert.equal(wranglerJson.route,undefined);
+ assert.doesNotMatch(JSON.stringify(wranglerJson),/joinsalu\.com/);
+ assert.notEqual(wranglerJson.assets.not_found_handling,"single-page-application");
 });
 
 test("deploys from GitHub Actions with the documented Cloudflare secrets",()=>{
