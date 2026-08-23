@@ -18,6 +18,8 @@ import {
   resolveProviderAccount,
 } from "../provider/service.ts";
 import {applyCreditEntry, rememberMember, resetPaymentMemory} from "../payments/ledger.ts";
+import {liveServiceId} from "../providers/catalog.ts";
+import {resetProviderMemory, submitApplication, updateApplicationStatus} from "../providers/service.ts";
 import type {Member} from "../domain/types.ts";
 
 async function seedMember(id = "member_ava"): Promise<Member> {
@@ -227,6 +229,49 @@ test("another practice cannot accept a Tide & Tone request", async () => {
     () => acceptRequest({provider: outsider, requestId: opened.id}),
     (error: unknown) => error instanceof ProviderError && error.status === 404,
   );
+});
+
+test("approved Apply email can sign in and accept a live catalog booking", async () => {
+  resetProviderMemory();
+  const member = await seedMember();
+  await fund(member, 200);
+  const application = await submitApplication({
+    fullName: "Camila Ortega",
+    email: "camila.ortega@example.com",
+    licenseType: "LMT",
+    licenseNumber: "MA12345",
+    mobileAtHome: true,
+    neighborhoods: ["Brickell"],
+    rateAsk: "$150 / visit",
+    insuranceAttested: true,
+  });
+  await updateApplicationStatus({id: application.id, status: "approved"});
+
+  const provider = await resolveProviderAccount({
+    email: "camila.ortega@example.com",
+    displayName: "Camila Ortega",
+  });
+  assert.ok(provider);
+  assert.equal(provider.status, "approved");
+  assert.equal(provider.practiceId, application.id);
+  assert.equal(provider.displayName, "Camila Ortega");
+  assert.ok(provider.serviceIds.includes(liveServiceId(application.id, "deep-tissue")));
+
+  const created = await createMemberBooking({
+    member,
+    serviceId: liveServiceId(application.id, "deep-tissue"),
+    date: "Tomorrow · 5:00 PM",
+    mode: "At home · Brickell",
+    enforceCredits: true,
+  });
+  assert.equal(created.booking.assignment, "unassigned");
+  const opened = await requestForBooking(created.booking.id);
+  assert.ok(opened);
+  assert.equal(opened.practiceId, application.id);
+
+  const accepted = await acceptRequest({provider, requestId: opened.id});
+  assert.equal(accepted.status, "accepted");
+  assert.equal((await listMemberBookings(member.id))[0]?.assignment, "accepted");
 });
 
 test("provider APIs stay demo without a session and do not need Stripe or Connect", async () => {
