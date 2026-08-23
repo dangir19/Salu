@@ -116,7 +116,7 @@ export default function SaluApp({initialPage="home",initialSession=null,initialA
  useEffect(()=>{if(!session||authResume.current)return;const pending=takePendingAuth();if(!pending)return;authResume.current=true;setAuthOpen(false);const intent=pending.intent;if(intent.kind==="book"){const service=services.find(s=>s.id===intent.serviceId);if(service)confirmBooking(service,intent.date,intent.mode,planPrice(service.standardPrice,activePlan));return}if(intent.kind==="credits"){addCredits();return}if(intent.kind==="package"){const pack=packages.find(item=>item.name===intent.name);if(pack)purchasePackage(pack,planPrice(Math.round(pack.price*.9),activePlan));return}if(intent.kind==="join"){if(intent.plan==="Member"||intent.plan==="Gold"||intent.plan==="Platinum")setSelectedPlan(intent.plan);completeOnboarding(intent.name??"",intent.home??homeBase);return}if(intent.kind==="profile")go("household")},[session]);
  const memberPage=!['provider','provider-signin','admin','signin'].includes(page);
  if(page==="provider-signin") return <ProviderSignIn returnTo="/provider" surface={surface}/>;
- if(page==="admin"&&!authReady&&isMemberShell("admin")) return <AuthLoading/>;
+ if(page==="admin"&&!authReady&&isMemberShell(page)) return <AuthLoading/>;
  if(page==="admin"&&!session) return <SignIn returnTo="/admin" surface={surface}/>;
  if(page==="admin"&&!admin) return <AdminForbidden go={go} signOut={signOut}/>;
  return <div className="salu-app">
