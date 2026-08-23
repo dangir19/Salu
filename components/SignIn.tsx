@@ -1,12 +1,43 @@
 "use client";
+/* eslint-disable jsx-a11y/no-autofocus -- modal close control receives initial focus */
 
 import Link from "next/link";
-import {useState, type FormEvent} from "react";
+import {useEffect, useState, type FormEvent} from "react";
 import type {AuthSurface} from "../auth/env";
 
 type OAuthId = "google" | "apple" | "development" | "provider-development" | "admin-development";
 type BusyId = OAuthId | "credentials";
 type AccountMode = "signin" | "create";
+
+export type AuthIntent =
+  | {kind: "browse"}
+  | {kind: "book"; serviceId: string; date: string; mode: string}
+  | {kind: "credits"}
+  | {kind: "package"; name: string}
+  | {kind: "join"; plan: string; name?: string; home?: string}
+  | {kind: "profile"}
+  | {kind: "admin"};
+
+export const PENDING_AUTH_KEY = "salu-pending-auth";
+
+export function storePendingAuth(intent: AuthIntent, returnTo: string) {
+  try {
+    sessionStorage.setItem(PENDING_AUTH_KEY, JSON.stringify({intent, returnTo}));
+  } catch {
+    /* Private browsing. */
+  }
+}
+
+export function takePendingAuth(): {intent: AuthIntent; returnTo: string} | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_AUTH_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(PENDING_AUTH_KEY);
+    return JSON.parse(raw) as {intent: AuthIntent; returnTo: string};
+  } catch {
+    return null;
+  }
+}
 
 export default function SignIn({
   returnTo = "/",
@@ -15,10 +46,8 @@ export default function SignIn({
   returnTo?: string;
   surface: AuthSurface;
 }) {
-  const [busy, setBusy] = useState<BusyId | null>(null);
-  const [notice, setNotice] = useState(credentialsErrorFromSearch);
   const safeReturn = safePath(returnTo, "/", "/signin");
-  const staffGate = safeReturn === "/admin" || safeReturn.startsWith("/admin/");
+  const staffGate = isStaffReturn(safeReturn);
 
   return (
     <div className="salu-app signin-page">
@@ -28,43 +57,14 @@ export default function SignIn({
         <p>Your health concierge.</p>
         <small>Miami · in-home wellness, beautifully handled.</small>
       </div>
-      <section className="signin-card" id="signin-card">
-        <span className="eyebrow">{staffGate ? "SALU STAFF" : "MEMBERS"}</span>
-        <h1>{staffGate ? "Staff sign-in for the review queue." : "Come in. We’ll take it from here."}</h1>
-        <NativeAccountForm
-          kind="member"
-          busy={busy}
-          setBusy={setBusy}
-          setNotice={setNotice}
-          returnTo={safeReturn}
-          signInCopy={
-            staffGate
-              ? "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
-              : "Create an account with email, or sign back in. Atlas, your Credits and Miami bookings stay with your membership."
-          }
-          createCopy={
-            staffGate
-              ? "Create the staff email you’ll use on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
-              : "A few details and you’re in. Atlas, Credits and Miami bookings will stay with this membership."
-          }
-        />
-        <OAuthButtons
-          kind="member"
-          staffGate={staffGate}
-          surface={surface}
-          busy={busy}
-          start={(provider, configured, missing) =>
-            startOAuth({provider, configured, missing, returnTo: safeReturn, setBusy, setNotice})
-          }
-        />
-        {notice && <p className="signin-notice" role="status">{notice}</p>}
-        <p className="signin-footnote">
-          Independent providers deliver every service. Atlas does not diagnose or prescribe. For emergencies, call 911.
-        </p>
-        <p className="signin-switch">
-          <Link href="/provider/signin">Provider sign-in</Link>
-        </p>
-      </section>
+      <SignInCard
+        surface={surface}
+        returnTo={safeReturn}
+        staffGate={staffGate}
+        title={staffGate ? "Staff sign-in for the review queue." : "Come in. We’ll take it from here."}
+        switchHref="/provider/signin"
+        switchLabel="Provider sign-in"
+      />
     </div>
   );
 }
@@ -76,8 +76,6 @@ export function ProviderSignIn({
   returnTo?: string;
   surface: AuthSurface;
 }) {
-  const [busy, setBusy] = useState<BusyId | null>(null);
-  const [notice, setNotice] = useState(credentialsErrorFromSearch);
   const safeReturn = safePath(returnTo, "/provider", "/provider/signin");
 
   return (
@@ -88,35 +86,151 @@ export function ProviderSignIn({
         <p>Your health concierge.</p>
         <small>Miami · independent providers, filling live requests.</small>
       </div>
-      <section className="signin-card" id="signin-card">
-        <span className="eyebrow">PROVIDERS</span>
-        <h1>Come in. The request queue is waiting.</h1>
-        <NativeAccountForm
-          kind="provider"
-          busy={busy}
-          setBusy={setBusy}
-          setNotice={setNotice}
-          returnTo={safeReturn}
-          signInCopy="Use the email on your approved Apply. After approval, this same account opens the workspace with role=provider."
-          createCopy="Create the account you’ll use after approval. Role still comes from Apply, SALU_PROVIDER_EMAILS, or the labeled demo."
-        />
-        <OAuthButtons
-          kind="provider"
+      <SignInCard
+        kind="provider"
+        surface={surface}
+        returnTo={safeReturn}
+        title="Come in. The request queue is waiting."
+        signInCopy="Use the email on your approved Apply. After approval, this same account opens the workspace with role=provider."
+        createCopy="Create the account you’ll use after approval. Role still comes from Apply, SALU_PROVIDER_EMAILS, or the labeled demo."
+        switchHref="/signin"
+        switchLabel="Member sign-in"
+      />
+    </div>
+  );
+}
+
+export function SignInModal({
+  returnTo = "/",
+  surface,
+  intent,
+  onClose,
+}: {
+  returnTo?: string;
+  surface: AuthSurface;
+  intent?: AuthIntent;
+  onClose: () => void;
+}) {
+  const safeReturn = safePath(returnTo, "/", "/signin");
+  const staffGate = intent?.kind === "admin" || isStaffReturn(safeReturn);
+  const copy = modalCopy(intent, staffGate);
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="modal-backdrop signin-modal-backdrop">
+      <button type="button" className="modal-dismiss" aria-label="Close sign in" onClick={onClose} />
+      <section className="signin-modal" role="dialog" aria-modal="true" aria-labelledby="signin-title">
+        <button type="button" className="modal-close" autoFocus aria-label="Close sign in" onClick={onClose}>
+          ×
+        </button>
+        <SignInCard
           surface={surface}
-          busy={busy}
-          start={(provider, configured, missing) =>
-            startOAuth({provider, configured, missing, returnTo: safeReturn, setBusy, setNotice})
-          }
+          returnTo={safeReturn}
+          staffGate={staffGate}
+          title={copy.title}
+          signInCopy={copy.signInCopy}
+          createCopy={copy.createCopy}
+          compact
+          switchHref="/provider/signin"
+          switchLabel="Provider sign-in"
         />
-        {notice && <p className="signin-notice" role="status">{notice}</p>}
-        <p className="signin-footnote">
-          Payouts are not live yet. Accepting a request assigns the visit in-app. See PROVIDER.md.
-        </p>
-        <p className="signin-switch">
-          <Link href="/signin">Member sign-in</Link>
-        </p>
       </section>
     </div>
+  );
+}
+
+function SignInCard({
+  kind = "member",
+  surface,
+  returnTo,
+  staffGate = false,
+  title,
+  signInCopy,
+  createCopy,
+  compact = false,
+  switchHref,
+  switchLabel,
+}: {
+  kind?: "member" | "provider";
+  surface: AuthSurface;
+  returnTo: string;
+  staffGate?: boolean;
+  title: string;
+  signInCopy?: string;
+  createCopy?: string;
+  compact?: boolean;
+  switchHref: string;
+  switchLabel: string;
+}) {
+  const [busy, setBusy] = useState<BusyId | null>(null);
+  const [notice, setNotice] = useState(credentialsErrorFromSearch);
+  const [nativeReady, setNativeReady] = useState<boolean | null>(null);
+  const defaultSignIn = staffGate
+    ? "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
+    : kind === "provider"
+      ? "Use the email on your approved Apply. After approval, this same account opens the workspace with role=provider."
+      : "Create an account with email, or sign back in. Atlas, your Credits and Miami bookings stay with your membership.";
+  const defaultCreate = staffGate
+    ? "Create the staff email you’ll use on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
+    : kind === "provider"
+      ? "Create the account you’ll use after approval. Role still comes from Apply, SALU_PROVIDER_EMAILS, or the labeled demo."
+      : "A few details and you’re in. Atlas, Credits and Miami bookings will stay with this membership.";
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/auth/providers")
+      .then((res) => (res.ok ? res.json() : {}))
+      .then((providers: Record<string, unknown>) => {
+        if (!cancelled) setNativeReady(Boolean(providers.credentials));
+      })
+      .catch(() => {
+        if (!cancelled) setNativeReady(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <section className={`signin-card${compact ? " signin-card-compact" : ""}`} id="signin-card">
+      <span className="eyebrow">{staffGate ? "SALU STAFF" : kind === "provider" ? "PROVIDERS" : "MEMBERS"}</span>
+      <h1 id="signin-title">{title}</h1>
+      <NativeAccountForm
+        kind={kind}
+        busy={busy}
+        setBusy={setBusy}
+        setNotice={setNotice}
+        returnTo={returnTo}
+        nativeReady={nativeReady}
+        signInCopy={signInCopy ?? defaultSignIn}
+        createCopy={createCopy ?? defaultCreate}
+      />
+      <OAuthButtons
+        kind={kind}
+        staffGate={staffGate}
+        surface={surface}
+        busy={busy}
+        start={(provider, configured, missing) =>
+          startOAuth({provider, configured, missing, returnTo, setBusy, setNotice})
+        }
+      />
+      {notice && <p className="signin-notice" role="status">{notice}</p>}
+      <p className="signin-footnote">
+        {kind === "provider"
+          ? "Payouts are not live yet. Accepting a request assigns the visit in-app. See PROVIDER.md."
+          : "Independent providers deliver every service. Atlas does not diagnose or prescribe. For emergencies, call 911."}
+      </p>
+      <p className="signin-switch">
+        <Link href={switchHref}>{switchLabel}</Link>
+      </p>
+    </section>
   );
 }
 
@@ -126,6 +240,7 @@ function NativeAccountForm({
   setBusy,
   setNotice,
   returnTo,
+  nativeReady,
   signInCopy,
   createCopy,
 }: {
@@ -134,6 +249,7 @@ function NativeAccountForm({
   setBusy: (value: BusyId | null) => void;
   setNotice: (value: string) => void;
   returnTo: string;
+  nativeReady: boolean | null;
   signInCopy: string;
   createCopy: string;
 }) {
@@ -147,6 +263,12 @@ function NativeAccountForm({
     setBusy("credentials");
     setNotice("");
     try {
+      const ready = nativeReady ?? (await credentialsProviderReady());
+      if (!ready) {
+        setNotice("Email and password will be here shortly. Continue with Google, Apple, or a local preview.");
+        setBusy(null);
+        return;
+      }
       if (mode === "create") {
         const res = await fetch("/api/auth/register", {
           method: "POST",
@@ -262,7 +384,7 @@ function OAuthButtons({
           start(
             "google",
             surface.google,
-            "Google is coming soon on this deployment. Use email for now.",
+            "Google is coming soon on this deployment. Use email for now, or a local preview.",
           )
         }
       >
@@ -278,7 +400,7 @@ function OAuthButtons({
           start(
             "apple",
             surface.apple,
-            "Apple is coming soon on this deployment. Use email for now.",
+            "Apple is coming soon on this deployment. Use email for now, or a local preview.",
           )
         }
       >
@@ -355,6 +477,17 @@ async function startOAuth({
   }
 }
 
+async function credentialsProviderReady() {
+  try {
+    const res = await fetch("/api/auth/providers");
+    if (!res.ok) return false;
+    const providers = (await res.json()) as Record<string, unknown>;
+    return Boolean(providers.credentials);
+  } catch {
+    return false;
+  }
+}
+
 async function postCredentials({
   email,
   password,
@@ -387,6 +520,54 @@ async function postAuthForm(action: string, fields: Record<string, string>) {
   form.submit();
 }
 
+function modalCopy(intent: AuthIntent | undefined, staffGate: boolean) {
+  if (staffGate) {
+    return {
+      title: "Staff sign-in for the review queue.",
+      signInCopy: "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page.",
+      createCopy: "Create the staff email you’ll use on SALU_ADMIN_EMAILS. Applicant details never appear on this page.",
+    };
+  }
+  switch (intent?.kind) {
+    case "book":
+      return {
+        title: "Sign in to confirm this reservation.",
+        signInCopy: "We’ll hold the details and continue once you’re in.",
+        createCopy: "Create an account and we’ll confirm this visit on your membership.",
+      };
+    case "credits":
+      return {
+        title: "Sign in to fund Credits.",
+        signInCopy: "Credits stay with your membership — come in to add them.",
+        createCopy: "Create an account to keep Credits with you.",
+      };
+    case "package":
+      return {
+        title: "Sign in to add this to your membership.",
+        signInCopy: "Packages live on your account, not in the browser.",
+        createCopy: "Create an account and this package will wait for you.",
+      };
+    case "join":
+      return {
+        title: "Sign in to start your membership.",
+        signInCopy: "Gold and Platinum need an account so Stripe can find you.",
+        createCopy: "A few details and we’ll take you into membership.",
+      };
+    case "profile":
+      return {
+        title: "Sign in to open your profile.",
+        signInCopy: "Preferences, billing and sign-out live with your membership.",
+        createCopy: "Create an account to keep a Salu snapshot of your own.",
+      };
+    default:
+      return {
+        title: "Come in. We’ll take it from here.",
+        signInCopy: "Create an account with email, or sign back in. You can keep browsing Salu either way.",
+        createCopy: "A few details and you’re in. Atlas, Credits and Miami bookings will stay with this membership.",
+      };
+  }
+}
+
 function accountModeFromSearch(): AccountMode {
   if (typeof window === "undefined") return "signin";
   return new URLSearchParams(window.location.search).get("mode") === "create" ? "create" : "signin";
@@ -397,6 +578,10 @@ function credentialsErrorFromSearch() {
   return new URLSearchParams(window.location.search).get("error") === "CredentialsSignin"
     ? "We couldn’t sign you in with those details."
     : "";
+}
+
+function isStaffReturn(returnTo: string) {
+  return returnTo === "/admin" || returnTo.startsWith("/admin/");
 }
 
 function safePath(returnTo: string, fallback: string, blocked: string) {

@@ -50,7 +50,7 @@ Cloudflare Dashboard → **joinsalu.com** → **DNS → Records**. Note the apex
    curl -s https://joinsalu.com/api/auth/csrf
    ```
 
-   Expect Salu HTML (or `/signin` for gated pages), `server: cloudflare`, and CSRF JSON. Hard-refresh the browser and walk Home → Atlas → Explore → About.
+   Expect Salu HTML, `server: cloudflare`, and CSRF JSON. Hard-refresh the browser and walk Home → Atlas → Explore → About without signing in. `/admin` remains staff-gated.
 
 7. **Confirm CI is the publisher**  
    Make a no-op or real push to `main` and confirm Actions → Deploy succeeds. Do not publish from ChatGPT Sites anymore.

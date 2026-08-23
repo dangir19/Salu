@@ -55,7 +55,7 @@ Approved people appear on Explore as **independent providers**. Prototype portra
 
 | Visitor | `/admin` | List / status APIs |
 | --- | --- | --- |
-| Signed out | Redirect to `/signin` — the live queue is never rendered | `401` — no application rows |
+| Signed out | Staff sign-in (full page on `/admin`) — the live queue is never rendered | `401` — no application rows |
 | Signed in, email not on the allowlist | **Not authorized** (`403`) — no queue data | `403` — no application rows |
 | Signed in + allowlisted | Live review queue | `200` |
 

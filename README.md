@@ -62,8 +62,8 @@ app/
   api/stripe/webhook  Signed Stripe events → membership, Credits, Connect
   chatgpt-auth.ts     OpenAI Sites header identity
 components/
-  SaluApp.tsx         Member shell (gated on a real session)
-  SignIn.tsx          Hospitality email/password sign-in; Google / Apple optional
+  SaluApp.tsx         Member shell (browse without an account; sign-in popup)
+  SignIn.tsx          Hospitality email/password popup; Google / Apple optional
 auth/                 Auth.js config, env stubs, member mapping
 payments/             Stripe env, Checkout, webhook ledger
 connect/              Express accounts, transfers, payout settlement
@@ -85,7 +85,7 @@ ATLAS.md              Concierge tools, safety, and optional language-model path
 tests/                Render/build, auth identity, payments, deploy-config, booking, provider, Atlas, and Connect checks
 ```
 
-Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Those bookings also open assignable provider requests (`/api/provider/requests`). Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin` behind `SALU_ADMIN_EMAILS` and a signed-in staff session. Approved individuals appear in Explore and can sign in with `role=provider`. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: production builds require email/password, Google, Apple, or OpenAI Sites sign-in. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)**, **[PROVIDERS.md](./PROVIDERS.md)**, **[PROVIDER.md](./PROVIDER.md)**, and **[ATLAS.md](./ATLAS.md)**.
+Signed-in member appointments persist in D1 (`/api/bookings`) and survive refresh. Those bookings also open assignable provider requests (`/api/provider/requests`). Without a session, Appointments stay a labeled **demo** in browser storage. Provider applications persist in D1 (`/api/providers/apply`); BD reviews named people at `/admin` behind `SALU_ADMIN_EMAILS` and a signed-in staff session. Approved individuals appear in Explore and can sign in with `role=provider`. When Stripe keys are present, membership, Credit funding, and booking spend/refund share the D1 wallet ledger. Member identity is no longer “always Daniel / DG”: anonymous visitors browse in a labeled **Browsing Salu** mode, and production members sign in with email/password, or Google, Apple, or OpenAI Sites. Sign-in is a popup — it does not gate the homepage. The contracts in `domain/types.ts` separate wallet transactions from package entitlements and gross member funding from platform commission revenue. See **[BOOKINGS.md](./BOOKINGS.md)**, **[PROVIDERS.md](./PROVIDERS.md)**, **[PROVIDER.md](./PROVIDER.md)**, and **[ATLAS.md](./ATLAS.md)**.
 
 ## Production next steps
 

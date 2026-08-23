@@ -18,7 +18,7 @@ You do **not** need live Stripe, live OAuth, or D1 to compile, lint, or test. Wi
 
 | Path | Who |
 | --- | --- |
-| `/signin` | Members (email/password, optional Google / Apple, local preview) |
+| `/signin` | Members (popup over the browsable shell; email/password primary, optional Google / Apple, local preview) |
 | `/provider/signin` | Providers (same Auth.js; callback `/provider`) |
 
 Sessions are Auth.js JWTs. `/api/me` returns `{ member, provider, providers }`. `provider` is present only when the email is a demo practice, an allowlisted provider, or (after the recruitment PR) an **approved** application.

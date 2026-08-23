@@ -85,7 +85,7 @@ export const pageDescriptions: Record<Page,string>={
  provider:"Accept appointment requests, set up Stripe Connect payouts, and look up your Apply status.",
  "provider-signin":"Sign in with email, or continue with Google or Apple, to fill member appointment requests.",
  admin:"Staff-only Miami review queue for named providers, plus a labeled demo operating view of funds and volume.",
- signin:"Sign in with email, or continue with Google or Apple, to open your Salu membership.",
+ signin:"Sign in with email to book, buy Credits, or manage your Salu membership. Browsing does not require an account.",
 };
 
 export const publicPages: Page[] = ["signin","provider-apply","provider","provider-signin"];
