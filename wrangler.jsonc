@@ -19,6 +19,13 @@
     "not_found_handling": "none",
     "binding": "ASSETS"
   },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "salu",
+      "database_id": "f3319c15-a8f0-4b2c-acbc-ab9c0c9d57cf"
+    }
+  ],
   "images": {
     "binding": "IMAGES"
   }
