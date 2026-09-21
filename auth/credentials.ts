@@ -58,7 +58,28 @@ export async function registerNativeAccount(input: {
     return {ok: false, error: "Please wait a few minutes and try again.", status: 429};
   }
 
-  if ((await getStoredCredential(email)) || (await findMemberRecord({email}))) {
+  // Registration guard. A stored credential row means a password account already
+  // exists, so registering again is a duplicate -> 409 (sign in instead).
+  //
+  // A member row with NO credential row is one of two things:
+  //   (a) an orphan left by the old hash-after-insert ordering (or an interrupted
+  //       retry): the member row landed but the credential row never did, because
+  //       password hashing threw first. It is safe to repair — keep the member
+  //       row and attach the new credential below.
+  //   (b) an account that signed up through another provider (google / apple /
+  //       chatgpt / development). Letting credentials registration claim it would
+  //       hand the account to anyone who knows the email, so keep the 409 and
+  //       never overwrite its authProvider.
+  const stored = await getStoredCredential(email);
+  const existingMember = await findMemberRecord({email});
+  if (stored) {
+    return {
+      ok: false,
+      error: "We couldn’t create this account. Try signing in, or use a different email.",
+      status: 409,
+    };
+  }
+  if (existingMember && isClaimedByAnotherProvider(existingMember)) {
     return {
       ok: false,
       error: "We couldn’t create this account. Try signing in, or use a different email.",
@@ -66,22 +87,48 @@ export async function registerNativeAccount(input: {
     };
   }
 
-  const member = await upsertMemberRecord(
-    memberFromIdentity({
-      email,
-      name: displayName,
-      provider: "credentials",
-    }),
-  );
+  // Hash FIRST, before any write. If WebCrypto rejects (e.g. a platform
+  // iteration cap), this throws while no row exists yet, so a retry is not
+  // stuck behind the duplicate guard above. The old code upserted the member
+  // before hashing, which left orphan members that 409'd forever on retry.
+  //
+  // A single atomic D1 transaction across both tables would be stronger, but
+  // persistence here is dual-path (D1 when bound, in-process memory otherwise),
+  // so writes cannot be transactional in every environment. Hash-first ordering
+  // plus the repair path above closes the dead end instead.
+  const passwordHash = await hashPassword(password);
   const now = new Date().toISOString();
+
+  const member = await upsertMemberRecord(
+    existingMember
+      ? memberFromIdentity({
+          id: existingMember.id,
+          email,
+          name: displayName,
+          provider: "credentials",
+          createdAt: existingMember.createdAt,
+        })
+      : memberFromIdentity({
+          email,
+          name: displayName,
+          provider: "credentials",
+        }),
+  );
   await persistCredential({
     email,
     memberId: member.id,
-    passwordHash: await hashPassword(password),
+    passwordHash,
     createdAt: now,
     updatedAt: now,
   });
   return {ok: true, member};
+}
+
+function isClaimedByAnotherProvider(member: Member): boolean {
+  const provider = member.authProvider ?? null;
+  // null/undefined predates provider tracking and behaves like an orphaned
+  // credentials row — repairable, not claimable-by-OAuth.
+  return provider !== null && provider !== "credentials";
 }
 
 export async function verifyNativeLogin(
