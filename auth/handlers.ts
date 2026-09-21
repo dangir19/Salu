@@ -45,16 +45,12 @@ export async function handleRegister(request: Request): Promise<Response> {
     );
   }
 
-  try {
-    const result = await registerNativeAccount({
-      email: body.email,
-      password: body.password,
-      displayName: body.displayName,
-      ip: request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for"),
-    });
-    if (!result.ok) return Response.json({error: result.error}, {status: result.status});
-    return Response.json({ok: true});
-  } catch (e) {
-    return Response.json({debug: String((e as Error)?.message ?? e), stack: String((e as Error)?.stack ?? "").slice(0, 600)}, {status: 500});
-  }
+  const result = await registerNativeAccount({
+    email: body.email,
+    password: body.password,
+    displayName: body.displayName,
+    ip: request.headers.get("cf-connecting-ip") || request.headers.get("x-forwarded-for"),
+  });
+  if (!result.ok) return Response.json({error: result.error}, {status: result.status});
+  return Response.json({ok: true});
 }

@@ -21,7 +21,7 @@ function resetNativeAuth() {
 
 test("hashes passwords with WebCrypto PBKDF2 and verifies them", async () => {
   const encoded = await hashPassword("harbor-light-22");
-  assert.match(encoded, /^pbkdf2-sha256\$210000\$/);
+  assert.match(encoded, /^pbkdf2-sha256\$100000\$/);
   assert.equal(await verifyPassword("harbor-light-22", encoded), true);
   assert.equal(await verifyPassword("wrong-password", encoded), false);
   assert.equal(normalizeEmail("  Ava@JoinSalu.com "), "ava@joinsalu.com");

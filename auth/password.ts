@@ -2,7 +2,8 @@ const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_LENGTH = 128;
 const MIN_NAME_LENGTH = 1;
 const MAX_NAME_LENGTH = 80;
-const PBKDF2_ITERATIONS = 210_000;
+// Cloudflare Workers caps PBKDF2 at 100,000 iterations; stay at the platform max.
+const PBKDF2_ITERATIONS = 100_000;
 const HASH_BITS = 256;
 const SALT_BYTES = 16;
 
@@ -48,7 +49,12 @@ export async function verifyPassword(password: string, encoded: string): Promise
     await deriveBits(password, crypto.getRandomValues(new Uint8Array(SALT_BYTES)), PBKDF2_ITERATIONS);
     return false;
   }
-  const actual = await deriveBits(password, parsed.salt, parsed.iterations);
+  let actual: Uint8Array;
+  try {
+    actual = await deriveBits(password, parsed.salt, parsed.iterations);
+  } catch {
+    return false;
+  }
   return timingSafeEqual(actual, parsed.hash);
 }
 
