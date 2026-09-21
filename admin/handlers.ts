@@ -46,6 +46,7 @@ export type AdminBookingRow = {
   startsAt?: string;
   status: string;
   creditsCharged: number;
+  source?: string;
 };
 
 export type AdminOverview = {
@@ -53,7 +54,28 @@ export type AdminOverview = {
   applications: Record<string, number>;
   bookings: Record<string, number>;
   creditsOutstanding: number;
+  organizations: {total: number; pending: number; active: number};
 };
+
+export type AdminOrgRow = {
+  id: string;
+  name: string;
+  orgType: string;
+  contactName: string;
+  contactEmail: string;
+  status: string;
+  memberCount: number;
+  orderCount: number;
+  creditsSpent: number;
+  createdAt: string;
+};
+
+export const ADMIN_ORG_STATUSES = ["pending", "active", "suspended", "rejected"] as const;
+export type AdminOrgStatus = (typeof ADMIN_ORG_STATUSES)[number];
+
+function isAdminOrgStatus(value: unknown): value is AdminOrgStatus {
+  return typeof value === "string" && (ADMIN_ORG_STATUSES as readonly string[]).includes(value);
+}
 
 export type AdminStore = {
   listMembers(): Promise<AdminMemberRow[] | null>;
@@ -62,6 +84,9 @@ export type AdminStore = {
   cancelBooking(id: string): Promise<{booking: AdminBookingRow; refunded: boolean; availableCredits: number} | null>;
   assignProvider(id: string, providerId: string): Promise<AdminBookingRow | null>;
   adjustCredits(memberId: string, credits: number, label: string): Promise<{memberId: string; availableCredits: number; transactionId: string} | null>;
+  listOrgs(): Promise<AdminOrgRow[] | null>;
+  approveOrg(id: string): Promise<AdminOrgRow | null>;
+  setOrgStatus(id: string, status: AdminOrgStatus): Promise<AdminOrgRow | null>;
 };
 
 type D1 = Awaited<ReturnType<typeof getD1>>;
@@ -112,6 +137,7 @@ function toBookingRow(booking: Booking, member: Member | null): AdminBookingRow 
     startsAt: booking.startsAt,
     status: booking.status,
     creditsCharged: booking.creditsCharged,
+    source: booking.source ?? "web",
   };
 }
 
@@ -123,6 +149,82 @@ async function providerNameFor(providerId: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+type OrgLike = {
+  id: string;
+  name: string;
+  orgType: string;
+  contactName: string;
+  contactEmail: string;
+  status: string;
+  createdAt: string;
+};
+
+type OrgBookingLike = {
+  status?: string;
+  creditsCharged?: number;
+};
+
+type OrgDbModule = {
+  listOrganizations(): Promise<OrgLike[]>;
+  listOrgMembers(orgId: string): Promise<unknown[]>;
+  listBookingsForOrg(orgId: string): Promise<OrgBookingLike[]>;
+  updateOrganizationStatus(id: string, status: string): Promise<OrgLike | null>;
+};
+
+async function loadOrgDb(): Promise<OrgDbModule | null> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore: ../db/orgs is being built in parallel; this resolves once it lands.
+    const mod = await import("../db/orgs");
+    return mod as unknown as OrgDbModule;
+  } catch {
+    return null;
+  }
+}
+
+async function toAdminOrgRow(org: OrgLike, orgDb: OrgDbModule | null): Promise<AdminOrgRow> {
+  let memberCount = 0;
+  let orderCount = 0;
+  let creditsSpent = 0;
+  if (orgDb) {
+    try {
+      const [members, bookings] = await Promise.all([
+        orgDb.listOrgMembers(org.id).catch(() => [] as unknown[]),
+        orgDb.listBookingsForOrg(org.id).catch(() => [] as OrgBookingLike[]),
+      ]);
+      memberCount = members.length;
+      const billable = bookings.filter((booking) => booking.status !== "cancelled");
+      orderCount = billable.length;
+      creditsSpent = billable.reduce(
+        (sum, booking) => sum + Math.max(0, Number(booking.creditsCharged ?? 0) || 0),
+        0,
+      );
+    } catch {
+      // Per-org enrichment failures fall back to zeros.
+    }
+  }
+  return {
+    id: org.id,
+    name: org.name,
+    orgType: org.orgType,
+    contactName: org.contactName,
+    contactEmail: org.contactEmail,
+    status: org.status,
+    memberCount,
+    orderCount,
+    creditsSpent,
+    createdAt: org.createdAt,
+  };
+}
+
+async function setOrgStatusInStore(orgDb: OrgDbModule, id: string, status: AdminOrgStatus): Promise<AdminOrgRow> {
+  const updated = await orgDb.updateOrganizationStatus(id, status).catch(() => null);
+  if (!updated) {
+    throw new AdminError("That organization is not on file.", 404);
+  }
+  return toAdminOrgRow(updated, orgDb);
 }
 
 const defaultStore: AdminStore = {
@@ -181,6 +283,7 @@ const defaultStore: AdminStore = {
           mode: row.mode,
           status: row.status as Booking["status"],
           creditsCharged: row.creditsCharged,
+          source: row.source ?? "web",
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
         }, member);
@@ -212,11 +315,18 @@ const defaultStore: AdminStore = {
         (sum, row) => sum + Math.max(0, row.availableCredits ?? 0),
         0,
       );
+      const orgDb = await loadOrgDb();
+      const orgRows = orgDb ? await orgDb.listOrganizations().catch(() => [] as OrgLike[]) : [];
       return {
         members: memberRows.length,
         applications: applicationCounts,
         bookings: bookingCounts,
         creditsOutstanding,
+        organizations: {
+          total: orgRows.length,
+          pending: orgRows.filter((org) => org.status === "pending").length,
+          active: orgRows.filter((org) => org.status === "active").length,
+        },
       };
     } catch {
       return null;
@@ -293,6 +403,34 @@ const defaultStore: AdminStore = {
       throw new AdminError(error instanceof Error ? error.message : "Those credits could not be adjusted.");
     }
   },
+
+  async listOrgs(): Promise<AdminOrgRow[] | null> {
+    const db = await d1();
+    if (!db) return null;
+    const orgDb = await loadOrgDb();
+    if (!orgDb) return null;
+    try {
+      const orgs = await orgDb.listOrganizations();
+      return Promise.all(orgs.map((org) => toAdminOrgRow(org, orgDb)));
+    } catch {
+      return null;
+    }
+  },
+
+  async approveOrg(id: string): Promise<AdminOrgRow | null> {
+    const orgDb = await loadOrgDb();
+    if (!orgDb) return null;
+    return setOrgStatusInStore(orgDb, id, "active");
+  },
+
+  async setOrgStatus(id: string, status: AdminOrgStatus): Promise<AdminOrgRow | null> {
+    if (!isAdminOrgStatus(status)) {
+      throw new AdminError("Status must be pending, active, suspended, or rejected.");
+    }
+    const orgDb = await loadOrgDb();
+    if (!orgDb) return null;
+    return setOrgStatusInStore(orgDb, id, status);
+  },
 };
 
 function requireStoreValue<T>(value: T | null, message: string): T {
@@ -367,6 +505,32 @@ async function handleCredit(request: Request, store: AdminStore): Promise<Record
   return {memberId: result.memberId, availableCredits: result.availableCredits, transactionId: result.transactionId};
 }
 
+async function handleOrgs(store: AdminStore): Promise<Record<string, unknown>> {
+  const orgs = await store.listOrgs();
+  if (orgs === null) {
+    return {orgs: [], mockFallback: true, message: "D1 is unavailable — the organization list is empty."};
+  }
+  return {orgs};
+}
+
+async function handleApproveOrg(request: Request, store: AdminStore): Promise<Record<string, unknown>> {
+  const body = await readBody(request);
+  const orgId = typeof body.orgId === "string" ? body.orgId.trim() : "";
+  if (!orgId) throw new AdminError("Choose an organization to approve.");
+  const org = requireStoreValue(await store.approveOrg(orgId), "That organization is not in the admin store.");
+  return {org};
+}
+
+async function handleOrgStatus(request: Request, store: AdminStore): Promise<Record<string, unknown>> {
+  const body = await readBody(request);
+  const orgId = typeof body.orgId === "string" ? body.orgId.trim() : "";
+  const status = typeof body.status === "string" ? body.status.trim() : "";
+  if (!orgId) throw new AdminError("Choose an organization to update.");
+  if (!isAdminOrgStatus(status)) throw new AdminError("Status must be pending, active, suspended, or rejected.");
+  const org = requireStoreValue(await store.setOrgStatus(orgId, status), "That organization is not in the admin store.");
+  return {org};
+}
+
 async function withAdmin(
   request: Request,
   runtimeEnv: RuntimeEnv,
@@ -408,6 +572,15 @@ export async function handleAdminFetch(
   }
   if (url.pathname === "/api/admin/members/credit" && request.method === "POST") {
     return withAdmin(request, runtimeEnv, () => handleCredit(request, store));
+  }
+  if (url.pathname === "/api/admin/orgs" && request.method === "GET") {
+    return withAdmin(request, runtimeEnv, () => handleOrgs(store));
+  }
+  if (url.pathname === "/api/admin/orgs/approve" && request.method === "POST") {
+    return withAdmin(request, runtimeEnv, () => handleApproveOrg(request, store));
+  }
+  if (url.pathname === "/api/admin/orgs/status" && request.method === "POST") {
+    return withAdmin(request, runtimeEnv, () => handleOrgStatus(request, store));
   }
   return new Response("Not found", {status: 404});
 }

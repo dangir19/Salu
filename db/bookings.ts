@@ -3,7 +3,7 @@ import type {Booking} from "../domain/types";
 import {getDb} from "./index";
 import {bookings} from "./schema";
 
-function bookingFromRow(row: typeof bookings.$inferSelect): Booking {
+export function bookingFromRow(row: typeof bookings.$inferSelect): Booking {
   return {
     id: row.id,
     memberId: row.memberId,
@@ -20,6 +20,10 @@ function bookingFromRow(row: typeof bookings.$inferSelect): Booking {
     creditsCharged: row.creditsCharged,
     packageName: row.packageName ?? undefined,
     packageItem: row.packageItem ?? undefined,
+    orgId: row.orgId ?? undefined,
+    recipientName: row.recipientName ?? undefined,
+    recipientRoom: row.recipientRoom ?? undefined,
+    source: row.source ?? "web",
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -59,7 +63,7 @@ export async function ensureBookingsSchema(): Promise<boolean> {
     }
     // drizzle/0007 adds these columns on existing databases; make fresh
     // databases match the migrated shape as well.
-    for (const column of ["ALTER TABLE bookings ADD COLUMN provider_id text", "ALTER TABLE bookings ADD COLUMN slot_end text"]) {
+    for (const column of ["ALTER TABLE bookings ADD COLUMN provider_id text", "ALTER TABLE bookings ADD COLUMN slot_end text", "ALTER TABLE bookings ADD COLUMN org_id text", "ALTER TABLE bookings ADD COLUMN recipient_name text", "ALTER TABLE bookings ADD COLUMN recipient_room text", "ALTER TABLE bookings ADD COLUMN source text NOT NULL DEFAULT 'web'"]) {
       try {
         await db.run(sql.raw(column));
       } catch {
@@ -128,6 +132,10 @@ export async function insertBooking(booking: Booking): Promise<boolean> {
       creditsCharged: booking.creditsCharged,
       packageName: booking.packageName ?? null,
       packageItem: booking.packageItem ?? null,
+      orgId: booking.orgId ?? null,
+      recipientName: booking.recipientName ?? null,
+      recipientRoom: booking.recipientRoom ?? null,
+      source: booking.source ?? "web",
       createdAt: booking.createdAt,
       updatedAt: booking.updatedAt,
     });
@@ -146,6 +154,9 @@ export async function updateBooking(id: string, patch: Partial<Booking>): Promis
       slotEnd: patch.slotEnd === "" ? null : (patch.slotEnd ?? current.slotEnd),
       providerId: patch.providerId === "" ? null : (patch.providerId ?? current.providerId),
       status: patch.status ?? current.status,
+      orgId: patch.orgId === "" ? null : (patch.orgId ?? current.orgId),
+      recipientName: patch.recipientName === "" ? null : (patch.recipientName ?? current.recipientName),
+      recipientRoom: patch.recipientRoom === "" ? null : (patch.recipientRoom ?? current.recipientRoom),
       updatedAt: patch.updatedAt ?? new Date().toISOString(),
     };
     await db.update(bookings).set(next).where(eq(bookings.id, id));

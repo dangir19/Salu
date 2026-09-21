@@ -121,6 +121,11 @@ export type Booking={
   packageItem?:string;
   assignment?:BookingAssignment;
   proposedDate?:string;
+  orgId?:ID;
+  recipientName?:string;
+  recipientRoom?:string;
+  /** Where the booking was made: "web" (default) or "mcp" (member's AI assistant). */
+  source?:string;
   createdAt:string;
   updatedAt:string;
 };

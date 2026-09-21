@@ -4,6 +4,7 @@ import {
   restoreBookingCredits,
   spendBookingCredits,
 } from "../payments/ledger";
+import {spendOrgBookingCredits} from "../payments/org-ledger";
 import {creditsForService, findCatalogPackage, findCatalogService} from "./catalog";
 
 export class BookingError extends Error {
@@ -30,12 +31,26 @@ export type UiBooking = {
   packageItem?: string;
   assignment?: "unassigned" | "accepted" | "proposed" | "declined" | "assigned";
   proposedDate?: string;
+  source?: string;
 };
 
 const memory = new Map<string, Booking>();
 
+export type BookingLineItem = {
+  id: string;
+  bookingId: string;
+  label: string;
+  quantity: number;
+  unitCredits: number;
+  totalCredits: number;
+  createdAt: string;
+};
+
+const lineItemsMemory = new Map<string, BookingLineItem[]>();
+
 export function resetBookingMemory(): void {
   memory.clear();
+  lineItemsMemory.clear();
 }
 
 export function toUiBooking(booking: Booking): UiBooking {
@@ -52,6 +67,7 @@ export function toUiBooking(booking: Booking): UiBooking {
     packageItem: booking.packageItem,
     assignment: booking.assignment,
     proposedDate: booking.proposedDate,
+    source: booking.source ?? "web",
   };
 }
 
@@ -184,6 +200,24 @@ export async function listMemberBookings(memberId: string): Promise<Booking[]> {
   return attachRequests(sortBookings([...memory.values()].filter((row) => row.memberId === memberId)));
 }
 
+/** Bookings charged to an organization's wallet (no assignment requests attached). */
+export async function listOrgBookings(orgId: string): Promise<Booking[]> {
+  try {
+    const db = await import("../db/bookings");
+    await db.ensureBookingsSchema();
+    const orgsDb = await import("../db/orgs");
+    await orgsDb.ensureOrgsSchema();
+    const persisted = await orgsDb.listBookingsForOrg(orgId);
+    if (persisted) {
+      for (const row of persisted) memory.set(row.id, row);
+      return sortBookings(persisted);
+    }
+  } catch {
+    // Memory fallback.
+  }
+  return sortBookings([...memory.values()].filter((row) => row.orgId === orgId));
+}
+
 export async function createMemberBooking(input: {
   member: Member;
   serviceId: string;
@@ -196,6 +230,11 @@ export async function createMemberBooking(input: {
   startsAt?: string;
   slotEnd?: string;
   enforceCredits: boolean;
+  orgId?: string;
+  recipientName?: string;
+  recipientRoom?: string;
+  /** Where the booking was made: "web" (default) or "mcp" (member's AI assistant). */
+  source?: string;
 }): Promise<{booking: Booking; creditsApplied: boolean; availableCredits: number}> {
   const service = findCatalogService(input.serviceId)
     ?? await import("../providers/service").then((mod) => mod.findApprovedCatalogService(input.serviceId));
@@ -203,6 +242,9 @@ export async function createMemberBooking(input: {
   const date = input.date.trim();
   const mode = input.mode.trim();
   if (!date || !mode) throw new BookingError("Choose a time and setting for this reservation.");
+  if (input.orgId && input.packageName) {
+    throw new BookingError("Packages are for personal memberships — business orders use the org wallet.");
+  }
 
   let creditsCharged = creditsForService(service.id, input.member.planId) ?? service.standardPrice;
   let packageName: string | undefined;
@@ -237,6 +279,10 @@ export async function createMemberBooking(input: {
     creditsCharged,
     packageName,
     packageItem,
+    orgId: input.orgId,
+    recipientName: input.recipientName?.trim() || undefined,
+    recipientRoom: input.recipientRoom?.trim() || undefined,
+    source: input.source ?? "web",
     createdAt: now,
     updatedAt: now,
   };
@@ -244,23 +290,72 @@ export async function createMemberBooking(input: {
   let creditsApplied = false;
   let availableCredits = 0;
   try {
-    const spent = await spendBookingCredits({
-      member: input.member,
-      credits: creditsCharged,
-      bookingId: booking.id,
-      label: service.name,
-      enforce: input.enforceCredits && !packageName,
-    });
-    creditsApplied = spent.applied;
-    availableCredits = spent.availableCredits;
+    if (input.orgId) {
+      const spent = await spendOrgBookingCredits({
+        orgId: input.orgId,
+        credits: creditsCharged,
+        bookingId: booking.id,
+        label: service.name,
+        enforce: input.enforceCredits,
+      });
+      creditsApplied = spent.applied;
+      availableCredits = spent.availableCredits;
+    } else {
+      const spent = await spendBookingCredits({
+        member: input.member,
+        credits: creditsCharged,
+        bookingId: booking.id,
+        label: service.name,
+        enforce: input.enforceCredits && !packageName,
+      });
+      creditsApplied = spent.applied;
+      availableCredits = spent.availableCredits;
+    }
   } catch (error) {
     if (error instanceof InsufficientCreditsError) throw error;
     if (input.enforceCredits && !packageName) throw error;
   }
 
   await persistBooking(booking);
+  if (input.orgId) {
+    const label = booking.recipientName ? `${service.name} · ${booking.recipientName}` : service.name;
+    const lineItem: BookingLineItem = {
+      id: `bli_${crypto.randomUUID()}`,
+      bookingId: booking.id,
+      label,
+      quantity: 1,
+      unitCredits: creditsCharged,
+      totalCredits: creditsCharged,
+      createdAt: now,
+    };
+    const items = lineItemsMemory.get(booking.id) ?? [];
+    lineItemsMemory.set(booking.id, [...items, lineItem]);
+    try {
+      const db = await import("../db/orgs");
+      await db.ensureOrgsSchema();
+      await db.insertLineItem(lineItem);
+    } catch {
+      // Line items persist when D1 is available; the booking itself is already stored.
+    }
+  }
   const withRequest = await attachRequest(booking);
   return {booking: withRequest, creditsApplied, availableCredits};
+}
+
+/** Invoice-ready line items for a booking: D1 first, memory fallback. */
+export async function listBookingLineItems(bookingId: string): Promise<BookingLineItem[]> {
+  try {
+    const db = await import("../db/orgs");
+    await db.ensureOrgsSchema();
+    const persisted = await db.listLineItemsForBooking(bookingId);
+    if (persisted && persisted.length) {
+      lineItemsMemory.set(bookingId, persisted);
+      return persisted;
+    }
+  } catch {
+    // Memory fallback.
+  }
+  return lineItemsMemory.get(bookingId) ?? [];
 }
 
 export async function acceptProposedBookingTime(input: {
@@ -462,6 +557,11 @@ export async function createScheduledMemberBooking(input: {
   packageName?: string;
   packageItem?: string;
   enforceCredits: boolean;
+  orgId?: string;
+  recipientName?: string;
+  recipientRoom?: string;
+  /** Where the booking was made: "web" (default) or "mcp" (member's AI assistant). */
+  source?: string;
 }): Promise<{booking: Booking; provider: {id: string; name: string}; creditsApplied: boolean; availableCredits: number}> {
   const {schedulingProviderId, getFreeSlots} = await import("../scheduling/slots");
   const {durationMinutesForService, findCatalogService} = await import("./catalog");
@@ -496,6 +596,10 @@ export async function createScheduledMemberBooking(input: {
     startsAt: slot.startISO,
     slotEnd: slot.endISO,
     enforceCredits: input.enforceCredits,
+    orgId: input.orgId,
+    recipientName: input.recipientName,
+    recipientRoom: input.recipientRoom,
+    source: input.source ?? "web",
   });
 
   const provider = await import("../provider/service");
@@ -524,6 +628,9 @@ export async function assignMemberBooking(input: {
   startISO: string;
   mode?: string;
   enforceCredits: boolean;
+  orgId?: string;
+  recipientName?: string;
+  recipientRoom?: string;
 }): Promise<{booking: Booking; provider: {id: string; name: string}}> {
   const {getFreeSlots, nyDayOf} = await import("../scheduling/slots");
   const {durationMinutesForService, findCatalogService} = await import("./catalog");
@@ -599,6 +706,9 @@ export async function assignMemberBooking(input: {
     providerId: winner.providerId,
     slotStart: winner.startISO,
     enforceCredits: input.enforceCredits,
+    orgId: input.orgId,
+    recipientName: input.recipientName,
+    recipientRoom: input.recipientRoom,
   });
   return {booking: result.booking, provider: result.provider};
 }

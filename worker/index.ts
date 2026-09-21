@@ -69,6 +69,16 @@ const worker = {
       return handleBookingsFetch(request, env as unknown as Record<string, string | undefined>);
     }
 
+    if (url.pathname === "/mcp" && request.method === "POST") {
+      const {handleMcpFetch} = await import("../mcp/server");
+      return handleMcpFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
+    if (url.pathname === "/api/tokens" || url.pathname === "/api/tokens/revoke") {
+      const {handleTokensFetch} = await import("../mcp/tokens");
+      return handleTokensFetch(request);
+    }
+
     if (url.pathname === "/api/providers/slots") {
       const {handleProviderSlotsFetch} = await import("../providers/slots");
       return handleProviderSlotsFetch(request);
@@ -92,6 +102,16 @@ const worker = {
     if (url.pathname === "/api/provider" || url.pathname.startsWith("/api/provider/")) {
       const {handleProviderFetch} = await import("../provider/handlers");
       return handleProviderFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
+    if (url.pathname === "/api/business" || url.pathname.startsWith("/api/business/")) {
+      const {handleBusinessFetch} = await import("../business/handlers");
+      return handleBusinessFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
+    if (url.pathname === "/api/health" || url.pathname.startsWith("/api/health/")) {
+      const {handleHealthFetch} = await import("../health/handlers");
+      return handleHealthFetch(request, env as unknown as Record<string, string | undefined>);
     }
 
     if (url.pathname === "/_vinext/image") {

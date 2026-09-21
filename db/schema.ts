@@ -1,4 +1,4 @@
-import {integer, primaryKey, sqliteTable, text} from "drizzle-orm/sqlite-core";
+import {integer, primaryKey, sqliteTable, text, uniqueIndex} from "drizzle-orm/sqlite-core";
 
 export const members = sqliteTable("members", {
   id: text("id").primaryKey(),
@@ -179,8 +179,82 @@ export const bookings = sqliteTable("bookings", {
   creditsCharged: integer("credits_charged").notNull().default(0),
   packageName: text("package_name"),
   packageItem: text("package_item"),
+  orgId: text("org_id"),
+  recipientName: text("recipient_name"),
+  recipientRoom: text("recipient_room"),
+  source: text("source").notNull().default("web"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
+});
+
+export const organizations = sqliteTable("organizations", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  orgType: text("org_type").notNull().default("other"),
+  contactName: text("contact_name").notNull(),
+  contactEmail: text("contact_email").notNull(),
+  contactPhone: text("contact_phone"),
+  address: text("address"),
+  billingEmail: text("billing_email"),
+  status: text("status").notNull().default("pending"),
+  stripeCustomerId: text("stripe_customer_id"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const orgMembers = sqliteTable("org_members", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  memberId: text("member_id").notNull(),
+  role: text("role").notNull().default("staff"),
+  createdAt: text("created_at").notNull(),
+}, (table) => [
+  uniqueIndex("org_members_org_member_idx").on(table.orgId, table.memberId),
+]);
+
+export const orgWallets = sqliteTable("org_wallets", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull().unique(),
+  availableCredits: integer("available_credits").notNull().default(0),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const orgCreditTransactions = sqliteTable("org_credit_transactions", {
+  id: text("id").primaryKey(),
+  walletId: text("wallet_id").notNull(),
+  kind: text("kind").notNull(),
+  credits: integer("credits").notNull(),
+  label: text("label").notNull(),
+  createdAt: text("created_at").notNull(),
+  bookingId: text("booking_id"),
+  stripeEventId: text("stripe_event_id"),
+  stripeObjectId: text("stripe_object_id"),
+});
+
+export const bookingLineItems = sqliteTable("booking_line_items", {
+  id: text("id").primaryKey(),
+  bookingId: text("booking_id").notNull(),
+  label: text("label").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unitCredits: integer("unit_credits").notNull(),
+  totalCredits: integer("total_credits").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const orgRecurringOrders = sqliteTable("org_recurring_orders", {
+  id: text("id").primaryKey(),
+  orgId: text("org_id").notNull(),
+  serviceId: text("service_id").notNull(),
+  providerId: text("provider_id"),
+  recipientName: text("recipient_name"),
+  recipientRoom: text("recipient_room"),
+  weekday: integer("weekday").notNull(),
+  timeLocal: text("time_local").notNull(),
+  startDate: text("start_date").notNull(),
+  endDate: text("end_date").notNull(),
+  status: text("status").notNull().default("active"),
+  createdBy: text("created_by").notNull(),
+  createdAt: text("created_at").notNull(),
 });
 
 export const providerAvailability = sqliteTable("provider_availability", {

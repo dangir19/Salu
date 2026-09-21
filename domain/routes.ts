@@ -17,7 +17,9 @@ export const pagePath: Record<Page,string>={
  provider:"/provider",
  "provider-signin":"/provider/signin",
  admin:"/admin",
+ business:"/business",
  signin:"/signin",
+ "ai-connect":"/ai-connect",
 };
 
 const pathAliases: Record<string,Page>={
@@ -45,7 +47,9 @@ const pathAliases: Record<string,Page>={
  "/provider":"provider",
  "/provider/signin":"provider-signin",
  "/admin":"admin",
+ "/business":"business",
  "/signin":"signin",
+ "/ai-connect":"ai-connect",
 };
 
 export const pageTitles: Record<Page,string>={
@@ -65,7 +69,9 @@ export const pageTitles: Record<Page,string>={
  provider:"Provider workspace — Salu",
  "provider-signin":"Provider sign in — Salu",
  admin:"Miami pipeline — Salu",
+ business:"Business — Salu",
  signin:"Sign in — Salu",
+ "ai-connect":"Connect your AI assistant — Salu",
 };
 
 export const pageDescriptions: Record<Page,string>={
@@ -86,6 +92,8 @@ export const pageDescriptions: Record<Page,string>={
  "provider-signin":"Sign in with email, or continue with Google or Apple, to fill member appointment requests.",
  admin:"Staff-only Miami review queue for named providers, plus a labeled demo operating view of funds and volume.",
  signin:"Sign in with email to book, buy Credits, or manage your Salu membership. Browsing does not require an account.",
+ business:"Salu for business — order wellness services for residents, guests, and teams from one dashboard.",
+ "ai-connect":"Let ChatGPT, Claude, or Muse book Salu appointments for you through the Salu MCP server.",
 };
 
 export const publicPages: Page[] = ["signin","provider-apply","provider","provider-signin"];
