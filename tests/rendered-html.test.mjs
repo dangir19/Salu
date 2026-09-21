@@ -211,6 +211,11 @@ test("uses package sessions before charging Credits and labels demo billing",()=
 });
 test("shows pricing, how-it-works and trust signals on Home",()=>{
  const home=app.slice(app.indexOf("function Home"),app.indexOf("function CompactService"));
+ assert.match(home,/MIAMI · PREMIUM IN-HOME WELLNESS/);
+ assert.match(home,/Membership &amp; pricing/);
+ assert.match(home,/every \$1 becomes 1 Credit\. Credits roll and never expire/);
+ assert.match(home,/Cancel more than 24 hours ahead and Credits come right back/);
+ assert.match(css,/\.hero-credit-line\{/);
  for(const term of ["function HomePlans","function HowItWorks","function HomeTrust","className=\"home-plans\"","Simple pricing, honest value.","Compare plans","home-plan home-plan-${name.toLowerCase()}","className=\"how-it-works\"","Three steps to feeling better.","className=\"home-trust\"","TRUST & SAFETY","Real people, carefully welcomed.","self-attested; Salu collects proof"]){assert.match(home,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
  for(const plan of ["Member","Gold","Platinum"]){assert.match(home,new RegExp(`\\["${plan}"`))}
  assert.match(home,/<HomePlans go=\{go\}\/>/);
@@ -230,6 +235,9 @@ test("guides the booking flow with steps and what-happens-next",()=>{
  assert.match(app,/Pick any free time on a live provider calendar/);
  assert.match(css,/\.modal-steps span\.active\{[^}]*background:var\(--forest\)/);
  assert.match(css,/\.next-steps li::before/);
+ assert.match(legacyPlanCss,/\.chip-row\{[^}]*display:flex/);
+ assert.match(legacyPlanCss,/\.chip-row button\{[^}]*min-height:44px/);
+ assert.match(legacyPlanCss,/\.chip-row button\.active\{[^}]*background:var\(--forest\)/);
 });
 test("gives providers a value prop and a clear process on Apply",()=>{
  const apply=app.slice(app.indexOf("function ProviderApplication"),app.indexOf("function ProviderPortal"));

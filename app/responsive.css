@@ -163,6 +163,7 @@
 @media(max-width:420px){.wordmark{font-size:27px}
 .hero h1{font-size:52px}
 .quiet-links{margin-left:0}
+.hero-credit-line{margin-left:0}
 .quiet-links button{font-size:15px;padding-inline:18px}
 .editorial-card{min-width:230px}
 .travel-form>div,.people-grid,.choice-grid{grid-template-columns:1fr}
@@ -175,5 +176,5 @@
 .service-facts{grid-template-columns:1fr 1fr}
 .service-facts span:last-child{grid-column:1/-1}
 .member-footer{grid-template-columns:1fr 1fr}
-.atlas-composer input{font-size:13px}
+.atlas-composer input{font-size:16px}
 }

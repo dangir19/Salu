@@ -112,6 +112,8 @@ async function handleCreate(request: Request, env: StripeEnv): Promise<Response>
     availabilityId?: string;
     providerId?: string;
     slotStart?: string;
+    /** Client retry key: retries with the same key replay the original booking. */
+    idempotencyKey?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -130,6 +132,7 @@ async function handleCreate(request: Request, env: StripeEnv): Promise<Response>
         packageName: body.packageName,
         packageItem: body.packageItem,
         enforceCredits: isStripeReady(env),
+        idempotencyKey: body.idempotencyKey,
       });
       const bookings = await listMemberBookings(member.id);
       return json({
@@ -150,6 +153,7 @@ async function handleCreate(request: Request, env: StripeEnv): Promise<Response>
       packageItem: body.packageItem,
       availabilityId: body.availabilityId,
       enforceCredits: isStripeReady(env),
+      idempotencyKey: body.idempotencyKey,
     });
     const bookings = await listMemberBookings(member.id);
     return json({
@@ -203,7 +207,7 @@ async function handleReschedule(request: Request): Promise<Response> {
     return json({source: "demo", error: "Sign in to move a saved reservation."}, 401);
   }
 
-  let body: {id?: string; date?: string};
+  let body: {id?: string; date?: string; startsAt?: string; slotEnd?: string};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -215,6 +219,10 @@ async function handleReschedule(request: Request): Promise<Response> {
       member,
       bookingId: body.id ?? "",
       date: body.date ?? "",
+      // Required when the reservation holds a real provider slot; the new
+      // slot is re-verified free and claimed atomically.
+      startsAt: body.startsAt,
+      slotEnd: body.slotEnd,
     });
     const bookings = await listMemberBookings(member.id);
     return json({

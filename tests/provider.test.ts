@@ -7,6 +7,7 @@ import {handleProviderFetch} from "../provider/handlers.ts";
 import {
   acceptRequest,
   blockProviderTime,
+  createAssignedRequestFromBooking,
   declineRequest,
   ensureWalkthroughRequest,
   listInboxForProvider,
@@ -18,6 +19,14 @@ import {
   resetProviderWorkspaceMemory,
   resolveProviderAccount,
 } from "../provider/service.ts";
+import {
+  deleteOverride,
+  listAvailability,
+  listOverrides,
+  replaceWeeklyAvailability,
+  resetSchedulingMemory,
+  upsertOverride,
+} from "../db/scheduling.ts";
 import {applyCreditEntry, rememberMember, resetPaymentMemory} from "../payments/ledger.ts";
 import {liveServiceId} from "../providers/catalog.ts";
 import {resetProviderMemory, submitApplication, updateApplicationStatus} from "../providers/service.ts";
@@ -317,4 +326,80 @@ test("provider APIs stay demo without a session and do not need Stripe or Connec
   const meBody = await me.json() as {source: string; provider: unknown};
   assert.equal(meBody.source, "demo");
   assert.equal(meBody.provider, null);
+});
+
+test("assigned requests from the scheduling engine reach the provider inbox", async () => {
+  const member = await seedMember();
+  await fund(member, 200);
+  const provider = await seedProvider();
+  assert.ok(provider);
+
+  const created = await createMemberBooking({
+    member,
+    serviceId: "deep-tissue",
+    date: "Tomorrow · 6:00 PM",
+    mode: "At home · Brickell",
+    enforceCredits: true,
+  });
+  const assigned = await createAssignedRequestFromBooking({
+    booking: created.booking,
+    member,
+    providerId: provider.id,
+  });
+  assert.ok(assigned);
+  assert.equal(assigned.status, "assigned");
+  assert.equal(assigned.assignedProviderId, provider.id);
+
+  const inbox = await listInboxForProvider(provider);
+  assert.ok(inbox.some((row) => row.id === assigned.id && row.status === "assigned"));
+
+  const accepted = await acceptRequest({provider, requestId: assigned.id});
+  assert.equal(accepted.status, "accepted");
+  assert.equal((await listMemberBookings(member.id))[0]?.assignment, "accepted");
+});
+
+test("provider weekly availability and date overrides round-trip", async () => {
+  resetSchedulingMemory();
+  const providerId = "prov_availability_test";
+
+  const windows = await replaceWeeklyAvailability(providerId, [
+    {dayOfWeek: 1, startMinutes: 540, endMinutes: 780},
+    {dayOfWeek: 3, startMinutes: 960, endMinutes: 1200},
+  ]);
+  assert.equal(windows.length, 2);
+  const listed = await listAvailability(providerId);
+  assert.deepEqual(listed.map((window) => [window.dayOfWeek, window.startMinutes, window.endMinutes]), [
+    [1, 540, 780],
+    [3, 960, 1200],
+  ]);
+
+  const replaced = await replaceWeeklyAvailability(providerId, [
+    {dayOfWeek: 6, startMinutes: 600, endMinutes: 840},
+  ]);
+  assert.equal(replaced.length, 1);
+  assert.equal((await listAvailability(providerId)).length, 1);
+
+  const override = await upsertOverride(providerId, {
+    date: "2026-10-05",
+    isClosed: true,
+    note: "Training day",
+  });
+  assert.equal(override.date, "2026-10-05");
+  assert.equal(override.isClosed, true);
+  assert.equal((await listOverrides(providerId)).length, 1);
+
+  const custom = await upsertOverride(providerId, {
+    date: "2026-10-05",
+    isClosed: false,
+    startMinutes: 600,
+    endMinutes: 720,
+    note: "Half day",
+  });
+  assert.equal(custom.id, override.id);
+  assert.equal(custom.isClosed, false);
+  assert.equal((await listOverrides(providerId)).length, 1);
+
+  assert.equal(await deleteOverride(providerId, override.id), true);
+  assert.equal((await listOverrides(providerId)).length, 0);
+  assert.equal(await deleteOverride(providerId, "ov_missing"), false);
 });

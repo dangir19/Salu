@@ -1,7 +1,14 @@
-import {describe, it} from "node:test";
+import {after, before, describe, it} from "node:test";
 import assert from "node:assert/strict";
+import {DatabaseSync} from "node:sqlite";
+import {drizzle, type SqliteRemoteDatabase} from "drizzle-orm/sqlite-proxy";
+import {sql} from "drizzle-orm";
+import type {getDb as getDbType} from "../db/index";
 import {
   aggregateActivitiesToDays,
+  buildStravaAuthorize,
+  completeStravaCallback,
+  HealthError,
   recommendRecovery,
   summarizeMetrics,
   validateApplePayload,
@@ -14,6 +21,14 @@ import {
 } from "../health/strava";
 import {isStravaReady, stravaConfigReport} from "../health/env";
 import type {HealthMetric} from "../db/health";
+import {
+  __injectHealthDbForTests,
+  consumeStravaOAuthState,
+  getHealthAccount,
+  storeStravaOAuthState,
+} from "../db/health";
+
+type Db = ReturnType<typeof getDbType>;
 
 function metric(partial: Partial<HealthMetric> & {date: string}): HealthMetric {
   return {
@@ -223,5 +238,121 @@ describe("strava env", () => {
     const env = {STRAVA_CLIENT_ID: "1", STRAVA_CLIENT_SECRET: "s"};
     assert.equal(isStravaReady(env), true);
     assert.equal(stravaConfigReport(env).ready, true);
+  });
+});
+
+describe("strava oauth state persistence (D1-backed)", () => {
+  const stravaEnv = {STRAVA_CLIENT_ID: "1", STRAVA_CLIENT_SECRET: "s"};
+  const tokenJson = {
+    access_token: "at_9",
+    refresh_token: "rt_9",
+    expires_at: 1900000000,
+    athlete: {id: 4242},
+    scope: "read,activity:read_all",
+  };
+  const okFetch = (async (input: unknown) => {
+    const url = String(input);
+    if (url.includes("/oauth/token")) return new Response(JSON.stringify(tokenJson), {status: 200});
+    return new Response("[]", {status: 200});
+  }) as unknown as typeof fetch;
+
+  let proxyDb: SqliteRemoteDatabase<Record<string, never>>;
+
+  before(() => {
+    // In-memory SQLite behind drizzle's sqlite-proxy, standing in for D1.
+    const sqlite = new DatabaseSync(":memory:");
+    proxyDb = drizzle(async (sqlText: string, params: unknown[], method: "run" | "all" | "values" | "get") => {
+      const stmt = sqlite.prepare(sqlText);
+      if (method === "run") {
+        stmt.run(...(params as unknown[]));
+        return {rows: []};
+      }
+      return {rows: stmt.all(...(params as unknown[])) as unknown[]};
+    });
+    __injectHealthDbForTests(proxyDb as unknown as Db);
+  });
+
+  after(() => {
+    __injectHealthDbForTests(null);
+  });
+
+  const future = () => new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  const past = () => new Date(Date.now() - 60 * 1000).toISOString();
+
+  it("round-trips state through the DB", async () => {
+    const {state, url} = await buildStravaAuthorize({id: "member_1"}, "https://x.com", stravaEnv);
+    assert.ok(state.length >= 32, "state should be a random token");
+    assert.equal(new URL(url).searchParams.get("state"), state);
+    const consumed = await consumeStravaOAuthState(state);
+    assert.equal(consumed?.memberId, "member_1");
+    assert.equal(consumed?.redirectUri, "https://x.com/api/health/strava/callback");
+  });
+
+  it("rejects expired states", async () => {
+    const ok = await storeStravaOAuthState({state: "oauth_expired_1", memberId: "member_1", expiresAt: past()});
+    assert.equal(ok, true);
+    assert.equal(await consumeStravaOAuthState("oauth_expired_1"), null);
+  });
+
+  it("rejects replay of a consumed state", async () => {
+    const ok = await storeStravaOAuthState({state: "oauth_replay_1", memberId: "member_1", expiresAt: future()});
+    assert.equal(ok, true);
+    assert.equal((await consumeStravaOAuthState("oauth_replay_1"))?.memberId, "member_1");
+    assert.equal(await consumeStravaOAuthState("oauth_replay_1"), null);
+  });
+
+  it("rejects a state issued for a different member", async () => {
+    const {state} = await buildStravaAuthorize({id: "member_1"}, "https://x.com", stravaEnv);
+    await assert.rejects(
+      () => completeStravaCallback({code: "c", state, member: {id: "member_2"}}, "https://x.com", stravaEnv, okFetch),
+      (err: unknown) => err instanceof HealthError && err.status === 400,
+    );
+  });
+
+  it("missing state fails with a clean 400, not a 500", async () => {
+    await assert.rejects(
+      () => completeStravaCallback({code: "c", state: "no_such_state"}, "https://x.com", stravaEnv, okFetch),
+      (err: unknown) => {
+        assert.ok(err instanceof HealthError, `expected HealthError, got ${err}`);
+        assert.equal((err as HealthError).status, 400);
+        return true;
+      },
+    );
+    await assert.rejects(
+      () => completeStravaCallback({code: "c", state: ""}, "https://x.com", stravaEnv, okFetch),
+      (err: unknown) => err instanceof HealthError && (err as HealthError).status === 400,
+    );
+  });
+
+  it("completes the full authorize → callback round trip and blocks replay", async () => {
+    const {state} = await buildStravaAuthorize({id: "member_9"}, "https://x.com", stravaEnv);
+    const result = await completeStravaCallback(
+      {code: "authcode", state, member: {id: "member_9"}},
+      "https://x.com",
+      stravaEnv,
+      okFetch,
+    );
+    assert.equal(result.syncedDays, 0);
+    const account = await getHealthAccount("member_9", "strava");
+    assert.equal(account?.accessToken, "at_9");
+    assert.equal(account?.refreshToken, "rt_9");
+    // The state was consumed: replaying it must fail with 400, not silently re-exchange.
+    await assert.rejects(
+      () => completeStravaCallback({code: "authcode", state, member: {id: "member_9"}}, "https://x.com", stravaEnv, okFetch),
+      (err: unknown) => err instanceof HealthError && (err as HealthError).status === 400,
+    );
+  });
+
+  it("prunes expired rows on write so the table does not grow unboundedly", async () => {
+    await proxyDb.run(sql.raw(
+      `INSERT INTO strava_oauth_states (state, member_id, created_at, expires_at)
+       VALUES ('prune_me', 'member_1', '2020-01-01T00:00:00.000Z', '2020-01-01T00:00:00.000Z')`,
+    ));
+    const ok = await storeStravaOAuthState({state: "prune_trigger", memberId: "member_1", expiresAt: future()});
+    assert.equal(ok, true);
+    const rows = await proxyDb.all<{state: string}>(sql.raw(
+      `SELECT state FROM strava_oauth_states WHERE state IN ('prune_me', 'prune_trigger')`,
+    ));
+    assert.deepEqual(rows.map((r) => r.state), ["prune_trigger"]);
   });
 });

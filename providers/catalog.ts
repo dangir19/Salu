@@ -139,6 +139,23 @@ export function catalogFromApplication(application: ProviderApplication): {servi
   const first = services[0];
   if (!first) return null;
 
+  const defaultAvailability = application.mobileAtHome
+    ? [
+        {dayOfWeek: 1, start: "09:00", end: "13:00"},
+        {dayOfWeek: 3, start: "09:00", end: "13:00"},
+        {dayOfWeek: 5, start: "09:00", end: "13:00"},
+        {dayOfWeek: 2, start: "16:00", end: "20:00"},
+        {dayOfWeek: 4, start: "16:00", end: "20:00"},
+        {dayOfWeek: 6, start: "10:00", end: "14:00"},
+      ]
+    : [
+        {dayOfWeek: 1, start: "09:00", end: "17:00"},
+        {dayOfWeek: 2, start: "09:00", end: "17:00"},
+        {dayOfWeek: 3, start: "09:00", end: "17:00"},
+        {dayOfWeek: 4, start: "09:00", end: "17:00"},
+        {dayOfWeek: 5, start: "09:00", end: "15:00"},
+      ];
+
   return {
     services,
     provider: {
@@ -154,6 +171,8 @@ export function catalogFromApplication(application: ProviderApplication): {servi
       reviews: 0,
       next: "Request with Atlas",
       serviceId: first.id,
+      bio: `${application.fullName} is a ${application.licenseType} serving ${application.neighborhoods.join(", ")}${application.mobileAtHome ? " — mobile and at-home" : " from their clinic"}.${application.notes ? ` ${application.notes}` : ""} Florida license number is self-reported — Salu has not verified credentials.`,
+      availability: defaultAvailability,
       source: "application",
     },
   };

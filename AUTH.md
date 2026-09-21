@@ -20,16 +20,32 @@ This is the real non-OAuth path in production. No extra env keys. `AUTH_SECRET` 
 | Step | Path |
 | --- | --- |
 | Create account | `POST /api/auth/register` with `{ email, password, displayName }` |
-| Sign in | Auth.js Credentials provider `credentials` → `/api/auth/signin/credentials` |
+| Sign in | Auth.js Credentials provider `credentials` → `POST /api/auth/callback/credentials` (Auth.js v5 only handles credentials in the callback action) |
 | Surfaces | Member **popup** over the browsable shell (`/signin` is a deep link) and `/provider/signin`. Same identity. Role still comes from approved Apply, `SALU_PROVIDER_EMAILS`, or the labeled Tide & Tone demo. |
 
 Safeguards shipped with the MVP:
 
 - Email is trimmed and lowercased.
 - Passwords need at least 8 characters (max 128).
-- Hashes are **PBKDF2-SHA-256** via Web Crypto (`pbkdf2-sha256$210000$salt$hash`). bcrypt / argon2 / Node `scrypt` need native or WASM bindings that are a poor fit for Cloudflare Workers; WebCrypto is what Workers actually accelerate.
+- Hashes are **PBKDF2-SHA-256** via Web Crypto (`pbkdf2-sha256$100000$salt$hash`). 100,000 iterations is the Cloudflare Workers WebCrypto cap — higher values throw. bcrypt / argon2 / Node `scrypt` need native or WASM bindings that are a poor fit for Cloudflare Workers; WebCrypto is what Workers actually accelerate.
 - Login errors stay generic (`We couldn’t sign you in with those details.`). Register does not confirm that an email already exists.
 - In-isolate rate limits on register (6 / 15 min) and login (8 / 15 min) per IP + email. This is best-effort until KV exists.
+
+### Registration ordering and repair (Sep 2026)
+
+`registerNativeAccount` (`auth/credentials.ts`) **hashes the password before writing any row**. If WebCrypto rejects the KDF, the error surfaces before a member row exists, so a retry is never stuck behind the duplicate guard. (The old order — upsert member, then hash — left orphan member rows with no credential that 409'd forever on retry; that is what stranded this morning's sign-ups.)
+
+Guard logic on re-register, in order:
+
+1. A `member_credentials` row exists → **409** (password account already exists; sign in instead).
+2. A member row exists with **no** credential row:
+   - `authProvider` is `credentials` (or unset — legacy rows) → **repair**: keep the member row, refresh the display name, attach the new credential. This is how the orphaned sign-ups from the 210k-iteration incident recover — the user just registers again.
+   - `authProvider` is `google` / `apple` / `chatgpt` / `development` → **409**. Credentials registration must never claim an OAuth-only account (anyone who knows the email could take it over).
+3. Neither exists → create member + credential normally.
+
+The 409 message stays generic and never confirms the email exists. Password verification fails closed: a malformed or KDF-rejected stored hash returns `false`, never throws, never verifies.
+
+No D1 migration is needed for this — it is a write-ordering and guard change only; the orphaned rows repair themselves on the next registration attempt with the same email.
 
 **Password reset later.** There is no email provider in this repo, so a reset-token mailer would need new secrets. `/signin` says reset is not available yet. A token table can land later without changing `member_credentials`.
 

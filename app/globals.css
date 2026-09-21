@@ -38,6 +38,7 @@ button{cursor:pointer;color:inherit}
 .quiet-links{display:flex;gap:20px;margin:20px 0 0 58px}
 .quiet-links button{min-height:44px;border:1px solid #173b3350;border-radius:999px;background:#fff;padding:11px 20px;color:var(--forest);font-size:15px;font-weight:750;box-shadow:0 8px 24px #173b330d;transition:transform .2s ease,box-shadow .2s ease,background .2s ease}
 .quiet-links button:hover{background:var(--sage);box-shadow:0 10px 28px #173b3318;transform:translateY(-1px)}
+.hero-credit-line{margin:16px 0 0 58px;font:italic 15px/1.5 var(--serif);color:var(--muted);max-width:560px}
 .home-apply{padding:36px 5vw;display:flex;align-items:center;justify-content:space-between;gap:32px;background:linear-gradient(125deg,#edf2e9,#faf8f2);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .home-apply h2{font:32px/.98 var(--serif);letter-spacing:-.03em;margin:10px 0 12px}
 .home-apply p{color:var(--muted);max-width:620px;line-height:1.55;margin:0}

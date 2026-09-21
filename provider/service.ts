@@ -269,6 +269,17 @@ async function resolveApprovedPractice(email: string): Promise<ProviderAccount |
   }
 }
 
+async function providerApplicationStillApproved(account: ProviderAccount): Promise<boolean> {
+  try {
+    const {listApplicationsForEmail} = await import("../providers/service");
+    const rows = await listApplicationsForEmail(account.email);
+    return rows.some((row) => row.status === "approved" && `prov_app_${row.id}` === account.id);
+  } catch {
+    // Transient lookup failures should not lock a provider out of their workspace.
+    return true;
+  }
+}
+
 export async function resolveProviderAccount(input: {
   id?: string | null;
   email?: string | null;
@@ -281,6 +292,14 @@ export async function resolveProviderAccount(input: {
 
   const existing = await storedAccountByEmail(email);
   if (existing) {
+    if (existing.id.startsWith("prov_app_") && !(await providerApplicationStillApproved(existing))) {
+      // BD moved this application out of "approved" (rejected, back under review).
+      // Drop the stale account so a rejected applicant can no longer open the
+      // workspace even when a D1 row was persisted at approval time.
+      accountMemory.delete(existing.email);
+      accountMemory.delete(existing.id);
+      return null;
+    }
     if (input.memberId && existing.memberId !== input.memberId) {
       return persistAccount({...existing, memberId: input.memberId, updatedAt: new Date().toISOString()});
     }
@@ -390,7 +409,8 @@ export async function cancelRequestForBooking(bookingId: string): Promise<Appoin
 export async function listInboxForProvider(provider: ProviderAccount): Promise<AppointmentRequest[]> {
   const rows = await allRequests();
   return rows.filter((row) =>
-    requestMatchesProvider(row, provider) && (row.status === "open" || row.status === "proposed")
+    requestMatchesProvider(row, provider) &&
+    (row.status === "open" || row.status === "proposed" || row.status === "assigned")
   );
 }
 

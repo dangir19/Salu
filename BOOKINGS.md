@@ -17,12 +17,12 @@ Member appointments persist on the server (D1) for signed-in sessions. Refreshin
 | Method | Path | Notes |
 | --- | --- | --- |
 | `GET` | `/api/bookings` | Member’s reservations. |
-| `POST` | `/api/bookings` | Confirm. Body: `serviceId`, `date`, `mode`, optional `packageName` / `packageItem`. |
-| `POST` | `/api/bookings/reschedule` | Body: `id`, `date`. No Credit movement. |
+| `POST` | `/api/bookings` | Confirm. Body: `serviceId`, `date`, `mode`, optional `packageName` / `packageItem`. Scheduled path: `providerId` + `slotStart`. Optional `idempotencyKey`: retries with the same key replay the original booking instead of double-booking / double-charging. |
+| `POST` | `/api/bookings/reschedule` | Body: `id`, `date`. Bookings that hold a real provider slot must also pass the new `startsAt` (`slotEnd` optional) — the new slot is re-verified free and claimed atomically; a display-date-only move is rejected for those. No Credit movement. |
 | `POST` | `/api/bookings/accept-proposal` | Body: `id`. Member accepts a provider-proposed time. Request becomes `accepted` at that slot. No Credit movement. |
 | `POST` | `/api/bookings/decline-proposal` | Body: `id`. Member declines a proposed time. Request returns to `open` / awaiting provider at the original time. Credits stay until cancel. |
-| `POST` | `/api/bookings/cancel` | Body: `id`. Restores Credits once when the booking had charged Credits. |
-| `POST` | `/api/bookings/complete` | Body: `id`. Marks the reservation completed and settles a Connect payout ([CONNECT.md](./CONNECT.md)). |
+| `POST` | `/api/bookings/cancel` | Body: `id`. Cancelling an upcoming reservation restores Credits **only when the booking actually debited the wallet** (org bookings refund to the org wallet, never the member). Double-cancel is a no-op; completed bookings cannot be cancelled. |
+| `POST` | `/api/bookings/complete` | Body: `id`. Marks the reservation completed and settles a Connect payout ([CONNECT.md](./CONNECT.md)). Cancelled bookings cannot be completed. |
 
 The Worker intercepts `/api/bookings` (same pattern as `/api/auth` and `/api/payments`). Catalog prices and Gold / Platinum discounts are computed on the server. When Stripe keys are present, a short wallet is rejected (`402`) instead of trusting the browser balance.
 
@@ -44,9 +44,19 @@ pnpm exec wrangler d1 execute salu --remote --file=drizzle/0005_connect.sql
 pnpm exec wrangler d1 execute salu --remote --file=drizzle/0006_credentials.sql
 ```
 
+Apply `drizzle/0007_provider_scheduling.sql` through `drizzle/0010_mcp.sql` the same way for the scheduling engine and org wallets. (Slot claims and idempotency keys live in `slot_claims` / `booking_idempotency` tables created at runtime by `ensureBookingsSchema()` in `db/bookings.ts` — no migration needed.)
+
 `0002_bookings.sql` adds `bookings` (`member_id`, service snapshot, display `date`, `status`, `credits_charged`, optional package fields). Provider applications and Connect payouts are later migrations — see [PROVIDERS.md](./PROVIDERS.md) and [CONNECT.md](./CONNECT.md). No extra env keys are required for bookings.
 
 A confirmed reservation also opens an assignable **appointment request** for the catalog practice. Providers fill those in [PROVIDER.md](./PROVIDER.md). When a provider proposes a new time, the signed-in member accepts or declines it from Appointments (`POST /api/bookings/accept-proposal` or `/api/bookings/decline-proposal`) without opening Atlas. Accept confirms the proposed slot; decline reopens the request as awaiting provider. Credits do not move either way.
+
+## Booking integrity
+
+- **Atomic slot claims.** Creating or moving a booking that holds a real provider slot first claims `[startsAt, slotEnd)` in a `slot_claims` table (created at runtime by `ensureBookingsSchema()` in `db/bookings.ts`). The claim is one `INSERT … SELECT … WHERE NOT EXISTS` statement, so two workers racing for the same or overlapping intervals resolve to exactly one winner (409 for the loser). The claim is released once the booking row is written; stale claims are swept after a 10-minute TTL. Without D1, an in-process claim store with the same overlap rules is used.
+- **Idempotent creation.** `POST /api/bookings` accepts an optional `idempotencyKey`. Repeats with the same key return the original booking and never charge twice — enforced by a `booking_idempotency` table (`PRIMARY KEY (member_id, idempotency_key)`, created at runtime by `ensureBookingsSchema()` in `db/bookings.ts`) plus a per-key lock. The key is claimed before the booking row is written, so concurrent retries collide on the key instead of creating duplicates; a key whose booking never landed is treated as an orphan and released on lookup. If a retry lands after the slot was taken by the original booking, it still replays the original instead of 409ing.
+- **No past slots.** Concrete-slot bookings (`createScheduledMemberBooking`, `assignMemberBooking`, reschedule) reject start times in the past with 400.
+- **Reschedule moves the slot.** For bookings with a real `startsAt`, reschedule requires the new slot (`startsAt`); it is verified free and claimed atomically (excluding the booking's own current interval), and the old slot is freed. Legacy display-date bookings keep the old date-only move.
+- **Refunds restore debits.** Cancellation refunds only when a matching negative `booking` ledger entry exists — a booking that never charged (free item, waived spend) cannot mint credits, and org bookings refund to the org wallet.
 
 You do **not** need live Stripe or Auth secrets to compile, lint, or test.
 

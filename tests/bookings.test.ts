@@ -7,6 +7,7 @@ import {
   acceptProposedBookingTime,
   BookingError,
   cancelMemberBooking,
+  completeMemberBooking,
   createMemberBooking,
   declineProposedBookingTime,
   InsufficientCreditsError,
@@ -376,4 +377,79 @@ test("booking API stays demo without a member session and does not need Stripe s
   }));
   assert.equal(declined.status, 401);
   assert.equal(((await declined.json()) as {source: string}).source, "demo");
+});
+
+test("cancelling an uncharged booking does not mint credits", async () => {
+  const member = await seedMember();
+  // Wallet is empty and enforcement is off, so nothing is debited.
+  const created = await createMemberBooking({
+    member,
+    serviceId: "deep-tissue",
+    date: "Tomorrow · 6:00 PM",
+    mode: "At home",
+    enforceCredits: false,
+  });
+  assert.equal(created.creditsApplied, false);
+
+  const cancelled = await cancelMemberBooking({member, bookingId: created.booking.id});
+  assert.equal(cancelled.creditsApplied, false);
+  assert.equal(cancelled.availableCredits, 0);
+
+  const billing = await getMemberBilling(member);
+  assert.equal(billing.wallet.availableCredits, 0);
+  assert.ok(!billing.transactions.some((row) => row.kind === "refund"));
+});
+
+test("cancelling a charged booking restores exactly what was charged, once", async () => {
+  const member = await seedMember();
+  await fund(member, 200);
+  const created = await createMemberBooking({
+    member,
+    serviceId: "deep-tissue",
+    date: "Tomorrow · 6:00 PM",
+    mode: "At home",
+    enforceCredits: true,
+  });
+  assert.equal(created.availableCredits, 80);
+
+  const cancelled = await cancelMemberBooking({member, bookingId: created.booking.id});
+  assert.equal(cancelled.creditsApplied, true);
+  assert.equal(cancelled.availableCredits, 200);
+
+  // Double-cancel is a no-op: no second refund.
+  const again = await cancelMemberBooking({member, bookingId: created.booking.id});
+  assert.equal(again.creditsApplied, false);
+  assert.equal(again.availableCredits, 200);
+
+  const billing = await getMemberBilling(member);
+  assert.equal(billing.transactions.filter((row) => row.kind === "refund").length, 1);
+});
+
+test("completed bookings cannot be cancelled and cancelled bookings cannot be completed", async () => {
+  const member = await seedMember();
+  const created = await createMemberBooking({
+    member,
+    serviceId: "deep-tissue",
+    date: "Tomorrow · 6:00 PM",
+    mode: "At home",
+    enforceCredits: false,
+  });
+  await completeMemberBooking({member, bookingId: created.booking.id});
+  await assert.rejects(
+    () => cancelMemberBooking({member, bookingId: created.booking.id}),
+    (error: unknown) => error instanceof BookingError,
+  );
+
+  const created2 = await createMemberBooking({
+    member,
+    serviceId: "deep-tissue",
+    date: "Tomorrow · 7:00 PM",
+    mode: "At home",
+    enforceCredits: false,
+  });
+  await cancelMemberBooking({member, bookingId: created2.booking.id});
+  await assert.rejects(
+    () => completeMemberBooking({member, bookingId: created2.booking.id}),
+    (error: unknown) => error instanceof BookingError && /cancelled/i.test(error.message),
+  );
 });

@@ -134,11 +134,20 @@ async function handleStatus(request: Request, runtimeEnv: RuntimeEnv): Promise<R
   try {
     const application = await updateApplicationStatus(body);
     const applications = await listApplications();
+    const warning =
+      application.status === "approved" &&
+      (application.docsLicenseProof !== "received" || application.docsInsurance !== "received")
+        ? `Approved with ${[
+            application.docsLicenseProof !== "received" ? "license proof" : "",
+            application.docsInsurance !== "received" ? "insurance proof" : "",
+          ].filter(Boolean).join(" and ")} still missing — they can already appear in Explore.`
+        : undefined;
     return json({
       source: "server",
       application,
       applications,
       opsOpen: auth.open,
+      ...(warning ? {warning} : {}),
     });
   } catch (error) {
     return errorResponse(error);

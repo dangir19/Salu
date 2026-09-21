@@ -1,10 +1,12 @@
 import {
+  consumeStravaOAuthState,
   deleteHealthAccount,
   getHealthAccount,
   listHealthAccounts,
   listHealthMetrics,
   memberIdForDeviceToken,
   storeDeviceToken,
+  storeStravaOAuthState,
   upsertHealthAccount,
   upsertHealthMetric,
   type HealthMetric,
@@ -32,23 +34,16 @@ function daysAgoISO(days: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// OAuth state (single-use, 10-minute TTL). Per-isolate memory; fine for v1.
+// OAuth state (single-use, 10-minute TTL). Persisted in D1 — Workers isolates do
+// not share memory, so an in-memory store breaks the authorize -> callback
+// round trip in production.
 // ---------------------------------------------------------------------------
-const oauthStates = new Map<string, {memberId: string; expiresAt: number}>();
+const OAUTH_STATE_TTL_MS = 10 * 60 * 1000;
 
-function rememberOAuthState(memberId: string): string {
+function newOAuthState(): string {
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
-  const state = [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
-  oauthStates.set(state, {memberId, expiresAt: Date.now() + 10 * 60 * 1000});
-  return state;
-}
-
-function consumeOAuthState(state: string): string | null {
-  const entry = oauthStates.get(state);
-  oauthStates.delete(state);
-  if (!entry || entry.expiresAt < Date.now()) return null;
-  return entry.memberId;
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
 export function stravaRedirectUri(origin: string): string {
@@ -71,11 +66,21 @@ export async function buildStravaAuthorize(
   if (!isStravaReady(env)) {
     throw new HealthError("Strava is not connected yet. Ask an admin to add the Strava API keys.", 503);
   }
-  const state = rememberOAuthState(member.id);
+  const state = newOAuthState();
+  const redirectUri = stravaRedirectUri(origin);
+  const stored = await storeStravaOAuthState({
+    state,
+    memberId: member.id,
+    redirectUri,
+    expiresAt: new Date(Date.now() + OAUTH_STATE_TTL_MS).toISOString(),
+  });
+  if (!stored) {
+    throw new HealthError("Could not start Strava authorization right now. Try again.", 503);
+  }
   return {
     url: stravaAuthorizeUrl({
       clientId: env.STRAVA_CLIENT_ID!,
-      redirectUri: stravaRedirectUri(origin),
+      redirectUri,
       state,
     }),
     state,
@@ -89,8 +94,8 @@ export async function completeStravaCallback(
   fetchFn: typeof fetch = fetch,
 ): Promise<{syncedDays: number}> {
   if (!isStravaReady(env)) throw new HealthError("Strava is not connected yet.", 503);
-  const memberId = consumeOAuthState(args.state);
-  if (!memberId || memberId !== args.member.id) {
+  const oauthState = await consumeStravaOAuthState(args.state);
+  if (!oauthState || oauthState.memberId !== args.member.id) {
     throw new HealthError("That Strava authorization expired or does not match your session. Try again.", 400);
   }
   if (!args.code) throw new HealthError("Strava did not return an authorization code.", 400);

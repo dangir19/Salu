@@ -15,7 +15,7 @@
 .checkout article>strong{font-size:15px}
 }
 
-.atlas-hero input{width:100%;border:0;outline:0;background:transparent;color:var(--ink);padding:2px 0;font-size:13px}
+.atlas-hero input{width:100%;border:0;outline:0;background:transparent;color:var(--ink);padding:2px 0;font-size:16px}
 .atlas-hero .atlas-prompt-examples{font-size:10px;line-height:1.35;color:var(--muted)}
 .atlas-hero .atlas-enter{width:38px;height:38px;flex:0 0 38px;border:0;border-radius:50%;display:grid;place-items:center;background:var(--forest);color:white}
 .atlas-hero .atlas-enter:disabled{background:#aeb8b1;cursor:not-allowed}

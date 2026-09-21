@@ -5,7 +5,16 @@ type Db = ReturnType<typeof getDbType>;
 
 // Lazy so plain Node test runs (which lack the cloudflare:workers module)
 // can import this file: the D1 binding is only touched inside withHealthDb.
+// Tests can inject an in-memory SQLite db via __injectHealthDbForTests().
+let injectedTestDb: Db | null = null;
+
+/** Test-only: replace the D1 binding with an injected db (e.g. in-memory SQLite). */
+export function __injectHealthDbForTests(db: Db | null): void {
+  injectedTestDb = db;
+}
+
 async function loadDb(): Promise<Db> {
+  if (injectedTestDb) return injectedTestDb;
   const mod = await import("./index");
   return mod.getDb();
 }
@@ -89,6 +98,18 @@ export async function ensureHealthSchema(): Promise<boolean> {
         ON health_metrics (member_id, date, source)`));
       await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS health_metrics_member_date_idx
         ON health_metrics (member_id, date)`));
+      // Strava OAuth states: single-use, 10-minute TTL. Persisted in D1 so the
+      // authorize -> callback round trip survives Workers isolate changes.
+      await db.run(sql.raw(`CREATE TABLE IF NOT EXISTS strava_oauth_states (
+        state text PRIMARY KEY NOT NULL,
+        member_id text NOT NULL,
+        code_verifier text,
+        redirect_uri text,
+        created_at text NOT NULL,
+        expires_at text NOT NULL
+      )`));
+      await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS strava_oauth_states_expires_at_idx
+        ON strava_oauth_states (expires_at)`));
       return true;
     }),
   );
@@ -331,5 +352,81 @@ export async function memberIdForDeviceToken(tokenHash: string): Promise<string 
     if (!rows[0]) return null;
     await db.run(sql.raw(`UPDATE health_device_tokens SET last_used_at = ${escape(new Date().toISOString())} WHERE token_hash = ${escape(tokenHash)}`));
     return rows[0].member_id;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Strava OAuth states: single-use, 10-minute TTL, persisted in D1 so the
+// authorize -> callback round trip works across Workers isolates.
+// No tokens are stored here; raw health tokens/payloads are never logged.
+// ---------------------------------------------------------------------------
+
+export type StravaOAuthState = {
+  state: string;
+  memberId: string;
+  codeVerifier: string | null; // reserved: Strava's auth-code flow does not use PKCE
+  redirectUri: string | null;
+  createdAt: string;
+  expiresAt: string;
+};
+
+type StravaOAuthStateRow = {
+  state: string;
+  member_id: string;
+  code_verifier: string | null;
+  redirect_uri: string | null;
+  created_at: string;
+  expires_at: string;
+};
+
+/** Store a fresh OAuth state. Expired rows are pruned on write so the table stays small. */
+export async function storeStravaOAuthState(args: {
+  state: string;
+  memberId: string;
+  codeVerifier?: string | null;
+  redirectUri?: string | null;
+  expiresAt: string;
+}): Promise<boolean> {
+  return Boolean(
+    await withHealthDb(async (db) => {
+      await ensureHealthSchema();
+      const now = new Date().toISOString();
+      await db.run(sql.raw(
+        `INSERT INTO strava_oauth_states (state, member_id, code_verifier, redirect_uri, created_at, expires_at)
+         VALUES (${escape(args.state)}, ${escape(args.memberId)}, ${escape(args.codeVerifier ?? null)}, ${escape(args.redirectUri ?? null)}, ${escape(now)}, ${escape(args.expiresAt)})`,
+      ));
+      // Lazy cleanup: keep the table from growing unboundedly.
+      await db.run(sql.raw(`DELETE FROM strava_oauth_states WHERE expires_at <= ${escape(now)}`));
+      return true;
+    }),
+  );
+}
+
+/**
+ * Consume an OAuth state (single-use). Returns null for unknown, expired, or
+ * already-consumed states. The row is deleted on read in every case, so a
+ * replay of a consumed state never succeeds.
+ */
+export async function consumeStravaOAuthState(state: string): Promise<StravaOAuthState | null> {
+  return withHealthDb(async (db) => {
+    await ensureHealthSchema();
+    if (!state) return null;
+    const rows = (await db.all(
+      sql.raw(`SELECT * FROM strava_oauth_states WHERE state = ${escape(state)} LIMIT 1`),
+    )) as unknown as StravaOAuthStateRow[];
+    // Delete on read regardless of validity: states are single-use.
+    await db.run(sql.raw(`DELETE FROM strava_oauth_states WHERE state = ${escape(state)}`));
+    const row = rows[0];
+    if (!row) return null;
+    // ISO-8601 UTC strings compare lexicographically; expired states are rejected.
+    if (row.expires_at <= new Date().toISOString()) return null;
+    return {
+      state: row.state,
+      memberId: row.member_id,
+      codeVerifier: row.code_verifier,
+      redirectUri: row.redirect_uri,
+      createdAt: row.created_at,
+      expiresAt: row.expires_at,
+    };
   });
 }

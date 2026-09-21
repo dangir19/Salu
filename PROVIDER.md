@@ -6,13 +6,13 @@ Independent Miami providers can sign in to a workspace that is **distinct from m
 
 1. Open **`/provider/signin`** (or **Provider workspace** in the footer).
 2. Create or sign in with **email and password**, or in development **Continue as Tide & Tone** — labeled demo provider, no Google app required.
-3. After approval, the same Auth.js email / Google / Apple account opens this workspace with `role=provider`.
+3. After approval, the same Auth.js email / Google / Apple account opens this workspace with `role=provider`. The account is re-validated against the application on every sign-in: if BD later moves the application out of `approved` (rejected, back under review), the workspace stops resolving that email — even when a provider-account row was persisted at approval time.
 4. Incoming member bookings for that practice appear in the in-app queue (polls every few seconds).
 5. **Accept**, **decline**, or **propose a new time**. When you propose, the member accepts or declines from Appointments — not only through Atlas.
 6. On **Schedule**, see accepted jobs, **mark complete**, and **block off** a time.
 7. On **Payouts** (and the request-home card), **Set up payouts** — Stripe Connect Express for that `provider_accounts` practice.
 
-You do **not** need live Stripe, live OAuth, or D1 to compile, lint, or test. Without `STRIPE_SECRET_KEY`, **Set up payouts** stays a labeled **demo**. Without a provider session, `/provider` keeps Apply / BD lookup plus the labeled **Tide & Tone fabricated demo**.
+You do **not** need live Stripe, live OAuth, or D1 to compile, lint, or test. Without `STRIPE_SECRET_KEY`, **Set up payouts** stays a labeled **demo**. Without a provider session, `/provider` keeps Apply / BD lookup plus the labeled **Tide & Tone fabricated demo**. The demo catalog in `domain/mock-data.ts` now gives every provider a short bio and a weekly availability pattern (Miami launch bench: deep tissue, sports recovery, prenatal, stretching/mobility across Brickell, Wynwood, Doral, South Beach, and more).
 
 ## Sign-in (distinct from member)
 
@@ -32,7 +32,7 @@ Demo emails `tide@localhost` and `provider@localhost` always resolve to **Tide &
 
 ## Member bookings become assignable requests
 
-When a signed-in member confirms a reservation (`POST /api/bookings` or Atlas `create_booking`), the server also writes an `appointment_requests` row (`open`) for that catalog practice. The member calendar shows **Awaiting provider** until someone accepts. See [ATLAS.md](./ATLAS.md).
+When a signed-in member confirms a reservation (`POST /api/bookings` or Atlas `create_booking`), the server also writes an `appointment_requests` row (`open`) for that catalog practice. When the scheduling engine places a visit with a specific provider, the request arrives as `assigned` — it appears in the same in-app queue with a "held for you" note so the provider can accept, propose another time, or decline. The member calendar shows **Awaiting provider** until someone accepts. See [ATLAS.md](./ATLAS.md).
 
 | Provider action | Request | Member appointment |
 | --- | --- | --- |
@@ -64,6 +64,10 @@ The Worker intercepts `/api/provider` and `/api/provider/*` only — not `/api/p
 | `POST` | `/api/bookings/complete` | Provider who owns that practice can complete an accepted job. |
 | `POST` | `/api/bookings/accept-proposal` | Member session. Accepts a `proposed` time; assignment uses that slot. |
 | `POST` | `/api/bookings/decline-proposal` | Member session. Returns the request to `open` at the original time. |
+
+The admin status endpoint (`POST /api/providers/applications/status`) answers with a `warning` when BD approves an application whose license proof or insurance proof is still `missing` — approving makes the provider visible in Explore, so the warning keeps the missing-docs gap explicit in the review flow.
+
+Weekly hours are recurring (`POST /api/provider/availability` with `windows`); date overrides cover holidays and one-off days and reject past dates. Proposing a new time and blocking a time accept free text with suggestions — the queue no longer limits the provider to three fixed slots.
 
 `GET`/`POST` without a provider session return `{ source: "demo" }` (401 on writes).
 

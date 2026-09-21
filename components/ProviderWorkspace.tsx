@@ -26,7 +26,7 @@ type UiRequest = {
   date: string;
   mode: string;
   creditsCharged: number;
-  status: "open" | "accepted" | "declined" | "proposed" | "cancelled";
+  status: "open" | "accepted" | "declined" | "proposed" | "cancelled" | "assigned";
   proposedDate?: string;
   note?: string;
   walkthrough?: boolean;
@@ -356,10 +356,14 @@ export default function ProviderWorkspace({
         body: JSON.stringify(body),
       });
       const data = await res.json() as InboxSnapshot;
+      if (res.status === 401) {
+        setToast("Your provider sign-in ended. Sign in again to keep working the queue.");
+        return;
+      }
       if (Array.isArray(data.requests)) setRequests(data.requests);
       if (Array.isArray(data.jobs)) setJobs(data.jobs);
       if (Array.isArray(data.blocks)) setBlocks(data.blocks);
-      if (data.error && res.status !== 401) {
+      if (data.error) {
         setToast(data.error);
         return;
       }
@@ -388,6 +392,10 @@ export default function ProviderWorkspace({
         }),
       });
       const data = await res.json() as InboxSnapshot;
+      if (res.status === 401) {
+        setToast("Your provider sign-in ended. Sign in again to keep working the queue.");
+        return;
+      }
       if (data.error) {
         setToast(data.error);
         return;
@@ -428,6 +436,12 @@ export default function ProviderWorkspace({
       setToast("Pick a date for the override.");
       return;
     }
+    const today = new Date();
+    const todayISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    if (overrideDate < todayISO) {
+      setToast("Overrides are for today onward — past dates are already behind you.");
+      return;
+    }
     const body: Record<string, string | number | boolean> = {date: overrideDate, isClosed: overrideClosed};
     if (!overrideClosed) {
       const startMinutes = timeInputToMinutes(overrideStart);
@@ -445,7 +459,11 @@ export default function ProviderWorkspace({
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(body),
-    }).then((res) => res.json() as Promise<InboxSnapshot>).then((data) => {
+    }).then(async (res) => ({res, data: await res.json() as InboxSnapshot})).then(({res, data}) => {
+      if (res.status === 401) {
+        setToast("Your provider sign-in ended. Sign in again to keep working the queue.");
+        return;
+      }
       if (data.error) {
         setToast(data.error);
         return;
@@ -464,7 +482,11 @@ export default function ProviderWorkspace({
       method: "DELETE",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({id}),
-    }).then((res) => res.json() as Promise<InboxSnapshot>).then((data) => {
+    }).then(async (res) => ({res, data: await res.json() as InboxSnapshot})).then(({res, data}) => {
+      if (res.status === 401) {
+        setToast("Your provider sign-in ended. Sign in again to keep working the queue.");
+        return;
+      }
       if (data.error) {
         setToast(data.error);
         return;
@@ -545,7 +567,7 @@ export default function ProviderWorkspace({
     return <DemoPortal go={go} />;
   }
 
-  const openRequests = requests.filter((row) => row.status === "open" || row.status === "proposed");
+  const openRequests = requests.filter((row) => row.status === "open" || row.status === "proposed" || row.status === "assigned");
 
   return (
     <PortalFrame
@@ -593,6 +615,9 @@ export default function ProviderWorkspace({
                   <h3>{request.serviceName}</h3>
                   <p>{request.memberDisplayName} · {request.mode}</p>
                   {request.note && <p className="request-note">{request.note}</p>}
+                  {request.status === "assigned" && (
+                    <p className="request-note">The scheduling engine held this visit for you. Accept to confirm it, propose another time, or decline.</p>
+                  )}
                   {request.status === "proposed" && request.proposedDate && (
                     <p className="request-note">You proposed {request.proposedDate}. Waiting for the member to accept or decline from Appointments.</p>
                   )}
@@ -607,14 +632,25 @@ export default function ProviderWorkspace({
                     className="propose-form"
                     onSubmit={(event) => {
                       event.preventDefault();
-                      void act("/api/provider/requests/propose", {id: request.id, date: proposeDate}, request.id, `Proposed ${proposeDate}.`);
+                      if (!proposeDate.trim()) {
+                        setToast("Type the time you want to propose.");
+                        return;
+                      }
+                      void act("/api/provider/requests/propose", {id: request.id, date: proposeDate.trim()}, request.id, `Proposed ${proposeDate.trim()}.`);
                     }}
                   >
                     <label>
                       Proposed time
-                      <select value={proposeDate} onChange={(event) => setProposeDate(event.target.value)}>
-                        {PROPOSE_TIMES.map((time) => <option key={time}>{time}</option>)}
-                      </select>
+                      <input
+                        type="text"
+                        list="salu-propose-times"
+                        value={proposeDate}
+                        onChange={(event) => setProposeDate(event.target.value)}
+                        placeholder="Friday · 6:30 PM"
+                      />
+                      <datalist id="salu-propose-times">
+                        {PROPOSE_TIMES.map((time) => <option key={time} value={time} />)}
+                      </datalist>
                     </label>
                     <button type="submit" disabled={busyId === request.id}>Send proposal</button>
                   </form>
@@ -783,14 +819,25 @@ export default function ProviderWorkspace({
               className="propose-form"
               onSubmit={(event) => {
                 event.preventDefault();
-                void act("/api/provider/schedule/block", {date: blockDate, note: "Provider blocked time"}, `block-${blockDate}`, `${blockDate} is blocked.`);
+                if (!blockDate.trim()) {
+                  setToast("Type the time you want to block.");
+                  return;
+                }
+                void act("/api/provider/schedule/block", {date: blockDate.trim(), note: "Provider blocked time"}, `block-${blockDate.trim()}`, `${blockDate.trim()} is blocked.`);
               }}
             >
               <label>
                 Block off
-                <select value={blockDate} onChange={(event) => setBlockDate(event.target.value)}>
-                  {BLOCK_TIMES.map((time) => <option key={time}>{time}</option>)}
-                </select>
+                <input
+                  type="text"
+                  list="salu-block-times"
+                  value={blockDate}
+                  onChange={(event) => setBlockDate(event.target.value)}
+                  placeholder="Tomorrow · 6:00 PM"
+                />
+                <datalist id="salu-block-times">
+                  {BLOCK_TIMES.map((time) => <option key={time} value={time} />)}
+                </datalist>
               </label>
               <button type="submit" disabled={Boolean(busyId)}>Block this time</button>
             </form>

@@ -9,6 +9,7 @@ import {
   resetLiveCatalogMemory,
 } from "../providers/catalog.ts";
 import {DEMO_ADMIN_EMAIL, isAdminEmail} from "../providers/env.ts";
+import {topProviders} from "../domain/mock-data.ts";
 import {
   findApprovedCatalogService,
   listApplications,
@@ -377,4 +378,93 @@ test("request-info works through the admin status endpoint", async () => {
   const body = await res.json() as {application: {status: string; reviewNote: string}};
   assert.equal(body.application.status, "under_review");
   assert.equal(body.application.reviewNote, "Insurance docs, please.");
+});
+
+test("demo seed catalog gives every provider a bio and a plausible weekly pattern", () => {
+  assert.ok(topProviders.length >= 6, "launch story needs a real bench of providers");
+  const areas = new Set(topProviders.map((provider) => provider.area));
+  assert.ok(areas.has("Brickell"));
+  assert.ok(areas.has("Wynwood") || areas.has("Doral") || areas.has("South Beach"));
+  for (const provider of topProviders) {
+    assert.ok(provider.bio && provider.bio.length > 40, `${provider.id} needs a bio`);
+    assert.ok(Array.isArray(provider.availability) && provider.availability.length > 0, `${provider.id} needs weekly availability`);
+    for (const window of provider.availability ?? []) {
+      assert.ok(Number.isInteger(window.dayOfWeek) && window.dayOfWeek >= 0 && window.dayOfWeek <= 6);
+      assert.match(window.start, /^\d{2}:\d{2}$/);
+      assert.match(window.end, /^\d{2}:\d{2}$/);
+      assert.ok(window.start < window.end, "window starts before it ends");
+    }
+    assert.ok(provider.rating >= 4.5 && provider.reviews > 0);
+  }
+  const specialties = new Set(topProviders.flatMap((provider) => provider.focuses));
+  assert.ok([...specialties].some((focus) => /deep tissue/i.test(focus)));
+  assert.ok([...specialties].some((focus) => /sports/i.test(focus)));
+  assert.ok([...specialties].some((focus) => /prenatal/i.test(focus)));
+  assert.ok([...specialties].some((focus) => /stretch/i.test(focus)));
+});
+
+test("application submit rejects bad email, missing name, and runaway rate asks", async () => {
+  resetProviderMemory();
+  await assert.rejects(
+    () => submitApplication(validPayload({email: "not-an-email"})),
+    (error: unknown) => error instanceof ProviderError && /email/i.test(error.message),
+  );
+  await assert.rejects(
+    () => submitApplication(validPayload({fullName: "   "})),
+    (error: unknown) => error instanceof ProviderError && /name/i.test(error.message),
+  );
+  await assert.rejects(
+    () => submitApplication(validPayload({rateAsk: "$1000 / visit plus travel and a very long explanation of rates and logistics and everything"})),
+    (error: unknown) => error instanceof ProviderError && /rate ask/i.test(error.message),
+  );
+});
+
+test("approved catalog providers carry a bio and availability", async () => {
+  resetProviderMemory();
+  resetLiveCatalogMemory();
+  const application = await submitApplication(validPayload({email: "bio@joinsalu.com", notes: "Bilingual — English and Spanish."}));
+  await updateApplicationStatus({id: application.id, status: "approved"});
+  const catalog = await listApprovedCatalog();
+  const provider = catalog.providers[0];
+  assert.ok(provider?.bio?.includes("Bilingual"));
+  assert.ok(Array.isArray(provider?.availability) && (provider?.availability?.length ?? 0) > 0);
+});
+
+test("approving with docs still missing warns BD in the status response", async () => {
+  resetProviderMemory();
+  resetMemberMemory();
+  const env = {SALU_ADMIN_EMAILS: "bd@joinsalu.com"};
+  const created = await submitApplication(validPayload({email: "warn@joinsalu.com"}));
+  const res = await handleProvidersFetch(new Request("http://localhost/api/providers/applications/status", {
+    method: "POST",
+    headers: {...sessionHeaders("bd@joinsalu.com"), "Content-Type": "application/json"},
+    body: JSON.stringify({id: created.id, status: "approved"}),
+  }), env);
+  assert.equal(res.status, 200);
+  const body = await res.json() as {warning?: string; application: {status: string}};
+  assert.equal(body.application.status, "approved");
+  assert.match(body.warning ?? "", /license proof.*insurance proof|insurance proof.*license proof/);
+
+  const docsDone = await submitApplication(validPayload({email: "clean@joinsalu.com"}));
+  await updateApplicationStatus({id: docsDone.id, docsLicenseProof: "received", docsInsurance: "received"});
+  const clean = await handleProvidersFetch(new Request("http://localhost/api/providers/applications/status", {
+    method: "POST",
+    headers: {...sessionHeaders("bd@joinsalu.com"), "Content-Type": "application/json"},
+    body: JSON.stringify({id: docsDone.id, status: "approved"}),
+  }), env);
+  const cleanBody = await clean.json() as {warning?: string};
+  assert.equal(cleanBody.warning, undefined);
+});
+
+test("rejected providers lose workspace access after approval", async () => {
+  resetProviderMemory();
+  resetProviderWorkspaceMemory();
+  const application = await submitApplication(validPayload({email: "revoked@joinsalu.com"}));
+  await updateApplicationStatus({id: application.id, status: "approved"});
+  const account = await resolveProviderAccount({email: "revoked@joinsalu.com"});
+  assert.ok(account);
+  assert.equal(account.status, "approved");
+
+  await updateApplicationStatus({id: application.id, status: "rejected"});
+  assert.equal(await resolveProviderAccount({email: "revoked@joinsalu.com"}), null);
 });

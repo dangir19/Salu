@@ -26,3 +26,17 @@ Do **not** treat wallet contributions as Salu revenue. Credits are customer liab
 1. Full tax / 1099 ops beyond what Connect Express already collects.
 2. Package entitlement tables (package redemptions already settle at catalog price).
 3. Atlas LLM, Cloudflare DNS cutover, live credential verification.
+
+## Health/Strava note (Sep 21, 2026)
+
+- Strava OAuth `state` is now persisted in D1 (`strava_oauth_states`, migration
+  `drizzle/0011_strava_oauth_state.sql`). Previously it lived in a per-isolate
+  in-memory Map, so the authorize → callback round trip broke in production
+  when the callback landed on a different Workers isolate.
+- Behavior: single-use states, 10-minute TTL enforced on consume, expired rows
+  pruned on write. Unknown/expired/consumed states fail the callback with a
+  clean 400 (redirect to `/apps?health=error&reason=exchange_failed`).
+- Apply `0011_strava_oauth_state.sql` to prod D1 manually (same as 0007–0010).
+  `db/health.ts` `ensureHealthSchema()` also creates the table at runtime.
+- Still Daniel's: Strava API app credentials (`STRAVA_CLIENT_ID`,
+  `STRAVA_CLIENT_SECRET` from strava.com/settings/api).
