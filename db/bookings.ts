@@ -1,4 +1,4 @@
-import {and, desc, eq, sql} from "drizzle-orm";
+import {desc, eq, sql} from "drizzle-orm";
 import type {Booking} from "../domain/types";
 import {bookings} from "./schema";
 
