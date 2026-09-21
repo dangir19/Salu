@@ -1,8 +1,9 @@
-import {getMemberSession} from "../auth/session";
+import {getMemberSession, getMePayload} from "../auth/session";
 import type {PaymentMethod} from "../domain/types";
-import {startBillingPortal, startCheckout, type CheckoutRequest} from "./checkout";
+import {NotConfiguredError, startBillingPortal, startCheckout, type CheckoutRequest} from "./checkout";
 import {applyStripeEnvToProcess, isStripeReady, paymentsSurface, readStripeEnv, type StripeEnv} from "./env";
 import {getMemberBilling, rememberMember} from "./ledger";
+import {paymentsConfigChecklist} from "./adminConfig";
 import {verifyStripeSignature} from "./signature";
 import {
   cardFromPaymentMethod,
@@ -61,6 +62,9 @@ export async function handlePaymentsFetch(request: Request, runtimeEnv: RuntimeE
   if (url.pathname === "/api/payments/portal" && request.method === "POST") {
     return handlePortal(request, env);
   }
+  if (url.pathname === "/api/payments/config") {
+    return handlePaymentsConfig(request, env, runtimeEnv);
+  }
   return new Response("Not found", {status: 404});
 }
 
@@ -101,6 +105,8 @@ async function handleCheckout(request: Request, env: StripeEnv): Promise<Respons
     return json({
       demo: true,
       url: null,
+      notConfigured: true,
+      missing: ["STRIPE_SECRET_KEY"],
       message: "Stripe is not connected yet. This local preview still uses labeled demo Credits.",
     }, 503);
   }
@@ -116,6 +122,9 @@ async function handleCheckout(request: Request, env: StripeEnv): Promise<Respons
     const result = await startCheckout(env, member, body, new URL(request.url).origin);
     return json(result);
   } catch (error) {
+    if (error instanceof NotConfiguredError) {
+      return json({error: error.message, notConfigured: true, missing: error.missing}, 503);
+    }
     const message = error instanceof Error ? error.message : "Stripe could not start checkout.";
     return json({error: message}, 400);
   }
@@ -125,7 +134,13 @@ async function handlePortal(request: Request, env: StripeEnv): Promise<Response>
   const member = await requireMember(request);
   if (!member) return json({error: "Sign in to continue."}, 401);
   if (!isStripeReady(env)) {
-    return json({demo: true, url: null, message: "Stripe Billing is not connected yet."}, 503);
+    return json({
+      demo: true,
+      url: null,
+      notConfigured: true,
+      missing: ["STRIPE_SECRET_KEY"],
+      message: "Stripe Billing is not connected yet.",
+    }, 503);
   }
   try {
     const result = await startBillingPortal(env, member, new URL(request.url).origin);
@@ -162,4 +177,17 @@ async function handleStripeWebhook(request: Request, env: StripeEnv): Promise<Re
 
   const result = await applyStripeEvent(env, event);
   return json(result);
+}
+
+async function handlePaymentsConfig(
+  request: Request,
+  env: StripeEnv,
+  runtimeEnv: RuntimeEnv,
+): Promise<Response> {
+  if (request.method !== "GET") return new Response("Method not allowed", {status: 405});
+  const me = await getMePayload(request, undefined, runtimeEnv);
+  if (!me.member) return json({error: "Sign in to continue."}, 401);
+  if (!me.admin) return json({error: "Admin access required."}, 403);
+  // Presence only: key values are never returned.
+  return json(paymentsConfigChecklist(env));
 }

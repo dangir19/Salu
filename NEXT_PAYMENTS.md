@@ -19,6 +19,7 @@ Do **not** treat wallet contributions as Salu revenue. Credits are customer liab
 - Transfers on `POST /api/bookings/complete` when `payouts_enabled`
 - Profile billing reads `/api/payments/me` (card last4 when Stripe has one)
 - Demo fallback when `STRIPE_SECRET_KEY` is missing
+- Admin payments setup section (`/admin` → "One paste from Daniel"): shows exactly which Stripe keys are missing, where Daniel finds each value, and a single copy-paste block. `GET /api/payments/config` is admin-gated and returns presence booleans only, never values.
 
 ## Still later
 

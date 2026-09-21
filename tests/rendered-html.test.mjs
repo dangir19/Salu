@@ -239,3 +239,9 @@ test("gives providers a value prop and a clear process on Apply",()=>{
  assert.match(css,/\.provider-value-grid\{[^}]*grid-template-columns:1fr 1fr/);
  assert.match(css,/\.provider-process ol\{[^}]*grid-template-columns:repeat\(4/);
 });
+test("gives admins a Stripe setup checklist with a single Daniel paste step",()=>{
+ for(const term of ["One paste from Daniel.","<AdminPaymentsSetup/>","Copy all six keys","/api/payments/config","The Daniel step","api/stripe/webhook","STRIPE_GOLD_PRICE_ID=price_paste_here"]){assert.match(app,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
+ assert.match(legacyPlanCss,/\.config-list li\{/);
+ assert.match(legacyPlanCss,/\.env-template\{[^}]*white-space:pre/);
+ assert.match(legacyPlanCss,/\.daniel-step\{/);
+});

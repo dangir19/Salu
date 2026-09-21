@@ -13,6 +13,15 @@ import {
   type StripeCustomer,
 } from "./stripe";
 
+export class NotConfiguredError extends Error {
+  missing: string[];
+  constructor(message: string, missing: string[]) {
+    super(message);
+    this.name = "NotConfiguredError";
+    this.missing = missing;
+  }
+}
+
 export type CheckoutRequest = {
   kind: "membership" | "credits";
   planId?: string;
@@ -111,7 +120,11 @@ async function startMembershipCheckout(
 
   const priceId = priceIdForPlan(env, planId);
   if (!priceId) {
-    throw new Error(`Ask Daniel to add STRIPE_${planId.toUpperCase()}_PRICE_ID before taking live cards.`);
+    const missingKey = `STRIPE_${planId.toUpperCase()}_PRICE_ID`;
+    throw new NotConfiguredError(
+      `Salu ${planNameFromId(planId)} checkout is not configured yet — Daniel needs to add ${missingKey} before taking live cards.`,
+      [missingKey],
+    );
   }
 
   const customer = await ensureCustomer(env, member);

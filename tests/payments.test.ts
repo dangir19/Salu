@@ -14,6 +14,9 @@ import {signedStripeHeader, verifyStripeSignature} from "../payments/signature.t
 import type {StripeEnv} from "../payments/env.ts";
 import type {StripeEvent} from "../payments/stripe.ts";
 import {applyStripeEvent} from "../payments/webhooks.ts";
+import {paymentsConfigChecklist, paymentsEnvTemplate} from "../payments/adminConfig.ts";
+import {NotConfiguredError, startCheckout} from "../payments/checkout.ts";
+import {handlePaymentsFetch} from "../payments/handlers.ts";
 
 const env: StripeEnv = {
   STRIPE_SECRET_KEY: "sk_test_dummy",
@@ -241,4 +244,77 @@ test("debits Credits when Stripe refunds a charge", async () => {
   const billing = await getMemberBilling(member);
   assert.equal(billing.wallet.availableCredits, 0);
   assert.equal(billing.transactions[0]?.kind, "refund");
+});
+test("reports every key as missing when Stripe is unconfigured", () => {
+  const report = paymentsConfigChecklist(readStripeEnv({
+    STRIPE_SECRET_KEY: "",
+    STRIPE_PUBLISHABLE_KEY: "",
+    STRIPE_WEBHOOK_SECRET: "",
+    STRIPE_GOLD_PRICE_ID: "",
+    STRIPE_PLATINUM_PRICE_ID: "",
+    STRIPE_CONNECT_CLIENT_ID: "",
+  }));
+  assert.equal(report.ready, false);
+  assert.deepEqual(report.missingRequired, [
+    "STRIPE_SECRET_KEY",
+    "STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_GOLD_PRICE_ID",
+    "STRIPE_PLATINUM_PRICE_ID",
+  ]);
+  assert.equal(report.items.length, 6);
+  for (const item of report.items) {
+    assert.deepEqual(Object.keys(item).sort(), ["configured", "example", "key", "label", "required", "where"]);
+  }
+});
+
+test("marks the payments setup ready when every required key is present", () => {
+  const report = paymentsConfigChecklist(readStripeEnv(env));
+  assert.equal(report.ready, true);
+  assert.deepEqual(report.missingRequired, []);
+  assert.ok(report.items.every((item) => item.configured || !item.required));
+});
+
+test("keeps the Daniel copy-paste template free of real values", () => {
+  const template = paymentsEnvTemplate();
+  for (const key of [
+    "STRIPE_SECRET_KEY",
+    "STRIPE_PUBLISHABLE_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "STRIPE_GOLD_PRICE_ID",
+    "STRIPE_PLATINUM_PRICE_ID",
+    "STRIPE_CONNECT_CLIENT_ID",
+  ]) {
+    assert.ok(template.includes(`${key}=`), `template names ${key}`);
+  }
+  assert.ok(template.split("\n").every((line) => line.endsWith("paste_here")), "every value is a paste_here placeholder");
+});
+
+test("refuses Gold checkout with a structured not-configured error when the price id is missing", async () => {
+  const member = await seedMember();
+  const priceMissing = {...env, STRIPE_GOLD_PRICE_ID: ""};
+  await assert.rejects(
+    () => startCheckout(priceMissing, member, {kind: "membership", planId: "gold"}, "https://joinsalu.com"),
+    (error) => {
+      assert.ok(error instanceof NotConfiguredError);
+      assert.deepEqual(error.missing, ["STRIPE_GOLD_PRICE_ID"]);
+      assert.match(error.message, /STRIPE_GOLD_PRICE_ID/);
+      return true;
+    },
+  );
+});
+
+test("rejects the admin payments config endpoint without a session", async () => {
+  const response = await handlePaymentsFetch(new Request("https://joinsalu.com/api/payments/config"));
+  assert.equal(response.status, 401);
+});
+
+test("rejects membership checkout without a session", async () => {
+  const response = await handlePaymentsFetch(
+    new Request("https://joinsalu.com/api/payments/checkout", {
+      method: "POST",
+      body: JSON.stringify({kind: "membership", planId: "gold"}),
+    }),
+  );
+  assert.equal(response.status, 401);
 });

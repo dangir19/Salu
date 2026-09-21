@@ -104,3 +104,18 @@
 .request-empty{color:var(--muted);padding:12px 0}
 .propose-form{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:12px;align-items:end}
 .propose-form label{display:flex;flex-direction:column;gap:6px;font-size:12px}
+.config-ready{background:#e8f2e4;border-left:3px solid var(--moss);padding:14px 16px;margin:0 0 16px;font-size:14px;border-radius:0 12px 12px 0}
+.config-pending{background:#f6ead6;border-left:3px solid var(--gold);padding:14px 16px;margin:0 0 16px;font-size:14px;border-radius:0 12px 12px 0}
+.config-list{list-style:none;margin:0 0 18px;padding:0}
+.config-list li{border-top:1px solid var(--line);padding:12px 0;font-size:13px}
+.config-list li>div{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.config-key{font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.config-pill{font-size:10px;font-weight:700;padding:3px 9px;border-radius:999px;letter-spacing:.04em}
+.config-ok .config-pill{background:#e8f2e4;color:var(--forest)}
+.config-missing .config-pill{background:#f6dfe0;color:#8f3b3f}
+.config-list small{display:block;color:var(--muted);margin-top:6px;line-height:1.5}
+.config-list code,.daniel-step code{font-family:ui-monospace,Menlo,monospace;font-size:11px;background:var(--ivory);padding:2px 6px;border-radius:5px}
+.daniel-step{background:var(--ivory);border:1px solid var(--line);border-radius:13px;padding:20px;font-size:13px}
+.daniel-step ol{margin:10px 0 16px;padding-left:20px;display:flex;flex-direction:column;gap:8px;line-height:1.5}
+.daniel-step .primary-button{border:0;background:var(--forest);color:#fff;border-radius:9px;padding:10px 18px;font-weight:700;cursor:pointer}
+.env-template{margin-top:14px;background:#1d241c;color:#dfe8da;border-radius:10px;padding:16px;font-size:12px;line-height:1.7;overflow-x:auto;white-space:pre}
