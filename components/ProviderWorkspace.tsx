@@ -32,18 +32,38 @@ type UiRequest = {
   walkthrough?: boolean;
 };
 type UiBlock = {id: string; date: string; note?: string};
+type UiWindow = {id: string; providerId: string; dayOfWeek: number; startMinutes: number; endMinutes: number};
+type UiOverride = {id: string; providerId: string; date: string; startMinutes?: number; endMinutes?: number; isClosed: boolean; note?: string};
 type InboxSnapshot = {
   source: "demo" | "server";
   provider?: ProviderAccount | null;
   requests?: UiRequest[];
   jobs?: UiRequest[];
   blocks?: UiBlock[];
+  windows?: UiWindow[];
+  overrides?: UiOverride[];
   error?: string;
   message?: string;
 };
 
 const PROPOSE_TIMES = ["Friday · 6:30 PM", "Friday · 8:00 PM", "Saturday · 10:00 AM"];
 const BLOCK_TIMES = ["Today · 4:00 PM", "Tomorrow · 6:00 PM", "Friday · 6:30 PM", "Saturday · 11:00 AM"];
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+function minutesToTimeInput(minutes: number): string {
+  const hour = Math.floor(minutes / 60);
+  const minute = minutes % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function timeInputToMinutes(value: string): number | null {
+  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return null;
+  return hour * 60 + minute;
+}
 
 function Eyebrow({children}:{children:React.ReactNode}) {
   return <span className="eyebrow">{children}</span>;
@@ -247,11 +267,21 @@ export default function ProviderWorkspace({
   const [requests, setRequests] = useState<UiRequest[]>([]);
   const [jobs, setJobs] = useState<UiRequest[]>([]);
   const [blocks, setBlocks] = useState<UiBlock[]>([]);
+  const [windows, setWindows] = useState<UiWindow[]>([]);
+  const [overrides, setOverrides] = useState<UiOverride[]>([]);
   const [busyId, setBusyId] = useState("");
   const [toast, setToast] = useState("");
   const [proposeFor, setProposeFor] = useState("");
   const [proposeDate, setProposeDate] = useState(PROPOSE_TIMES[0]);
   const [blockDate, setBlockDate] = useState(BLOCK_TIMES[0]);
+  const [newWindowDay, setNewWindowDay] = useState("1");
+  const [newWindowStart, setNewWindowStart] = useState("09:00");
+  const [newWindowEnd, setNewWindowEnd] = useState("17:00");
+  const [overrideDate, setOverrideDate] = useState("");
+  const [overrideClosed, setOverrideClosed] = useState(true);
+  const [overrideStart, setOverrideStart] = useState("09:00");
+  const [overrideEnd, setOverrideEnd] = useState("17:00");
+  const [overrideNote, setOverrideNote] = useState("");
   const [source, setSource] = useState<"demo" | "server">(provider ? "server" : "demo");
   const [connect, setConnect] = useState<ConnectSnapshot | null>(null);
   const [payoutBusy, setPayoutBusy] = useState(false);
@@ -264,7 +294,8 @@ export default function ProviderWorkspace({
       fetch("/api/provider/requests").then((res) => res.json()) as Promise<InboxSnapshot>,
       fetch("/api/provider/schedule").then((res) => res.json()) as Promise<InboxSnapshot>,
       fetch("/api/connect/me").then((res) => res.json()) as Promise<ConnectSnapshot>,
-    ]).then(([inbox, schedule, payouts]) => {
+      fetch("/api/provider/availability").then((res) => res.json()) as Promise<InboxSnapshot>,
+    ]).then(([inbox, schedule, payouts, availability]) => {
       if (inbox.source === "server" && Array.isArray(inbox.requests)) {
         setSource("server");
         setRequests(inbox.requests);
@@ -272,6 +303,12 @@ export default function ProviderWorkspace({
       if (schedule.source === "server") {
         if (Array.isArray(schedule.jobs)) setJobs(schedule.jobs);
         if (Array.isArray(schedule.blocks)) setBlocks(schedule.blocks);
+      }
+      if (availability.source === "server") {
+        if (Array.isArray(availability.windows)) setWindows(availability.windows);
+        if (Array.isArray(availability.overrides)) setOverrides(availability.overrides);
+        if (Array.isArray(availability.jobs)) setJobs(availability.jobs);
+        if (Array.isArray(availability.blocks)) setBlocks(availability.blocks);
       }
       setConnect(payouts);
       if (inbox.error) setToast(inbox.error);
@@ -334,6 +371,108 @@ export default function ProviderWorkspace({
     } finally {
       setBusyId("");
     }
+  };
+
+  const saveAvailability = async (next: UiWindow[], id: string, ok: string) => {
+    setBusyId(id);
+    try {
+      const res = await fetch("/api/provider/availability", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          windows: next.map((window) => ({
+            dayOfWeek: window.dayOfWeek,
+            startMinutes: window.startMinutes,
+            endMinutes: window.endMinutes,
+          })),
+        }),
+      });
+      const data = await res.json() as InboxSnapshot;
+      if (data.error) {
+        setToast(data.error);
+        return;
+      }
+      if (Array.isArray(data.windows)) setWindows(data.windows);
+      setToast(ok);
+    } catch {
+      setToast("Weekly hours could not be saved just now.");
+    } finally {
+      setBusyId("");
+    }
+  };
+
+  const addWindow = () => {
+    const startMinutes = timeInputToMinutes(newWindowStart);
+    const endMinutes = timeInputToMinutes(newWindowEnd);
+    const dayOfWeek = Number(newWindowDay);
+    if (startMinutes == null || endMinutes == null || startMinutes >= endMinutes) {
+      setToast("Pick a start time before the end time.");
+      return;
+    }
+    const next = [...windows, {
+      id: `draft-${Date.now()}`,
+      providerId: "",
+      dayOfWeek,
+      startMinutes,
+      endMinutes,
+    }];
+    void saveAvailability(next, "add-window", "Weekly hours saved.");
+  };
+
+  const removeWindow = (id: string) => {
+    void saveAvailability(windows.filter((window) => window.id !== id), `rm-window-${id}`, "Weekly hours saved.");
+  };
+
+  const saveOverride = () => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(overrideDate)) {
+      setToast("Pick a date for the override.");
+      return;
+    }
+    const body: Record<string, string | number | boolean> = {date: overrideDate, isClosed: overrideClosed};
+    if (!overrideClosed) {
+      const startMinutes = timeInputToMinutes(overrideStart);
+      const endMinutes = timeInputToMinutes(overrideEnd);
+      if (startMinutes == null || endMinutes == null || startMinutes >= endMinutes) {
+        setToast("Pick a start time before the end time.");
+        return;
+      }
+      body.startMinutes = startMinutes;
+      body.endMinutes = endMinutes;
+    }
+    if (overrideNote.trim()) body.note = overrideNote.trim();
+    setBusyId("save-override");
+    fetch("/api/provider/availability/override", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    }).then((res) => res.json() as Promise<InboxSnapshot>).then((data) => {
+      if (data.error) {
+        setToast(data.error);
+        return;
+      }
+      if (Array.isArray(data.overrides)) setOverrides(data.overrides);
+      setOverrideDate("");
+      setOverrideNote("");
+      setToast("Calendar override saved.");
+    }).catch(() => setToast("The override could not be saved just now."))
+      .finally(() => setBusyId(""));
+  };
+
+  const removeOverride = (id: string) => {
+    setBusyId(`rm-override-${id}`);
+    fetch("/api/provider/availability/override", {
+      method: "DELETE",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({id}),
+    }).then((res) => res.json() as Promise<InboxSnapshot>).then((data) => {
+      if (data.error) {
+        setToast(data.error);
+        return;
+      }
+      if (Array.isArray(data.overrides)) setOverrides(data.overrides);
+      setToast("Override removed.");
+    }).catch(() => setToast("The override could not be removed just now."))
+      .finally(() => setBusyId(""));
   };
 
   const startOnboard = async () => {
@@ -515,6 +654,125 @@ export default function ProviderWorkspace({
                 </button>
               </div>
             )) : <p className="request-empty">No accepted jobs yet. Take one from the request queue.</p>}
+          </section>
+          <section className="portal-card">
+            <div className="section-title">
+              <Eyebrow>WEEKLY HOURS</Eyebrow>
+              <h2>When members can book you.</h2>
+            </div>
+            {WEEKDAYS.map((weekday, dayOfWeek) => {
+              const dayWindows = windows.filter((window) => window.dayOfWeek === dayOfWeek);
+              return (
+                <div className="request-card" key={weekday}>
+                  <div>
+                    <small>{dayWindows.length ? `${dayWindows.length} window${dayWindows.length === 1 ? "" : "s"}` : "Closed"}</small>
+                    <h3>{weekday}</h3>
+                    {dayWindows.map((window) => (
+                      <p key={window.id}>
+                        {minutesToTimeInput(window.startMinutes)} – {minutesToTimeInput(window.endMinutes)}{" "}
+                        <button
+                          type="button"
+                          disabled={busyId === `rm-window-${window.id}`}
+                          onClick={() => removeWindow(window.id)}
+                        >Remove</button>
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+            <form
+              className="propose-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                addWindow();
+              }}
+            >
+              <label>
+                Day
+                <select value={newWindowDay} onChange={(event) => setNewWindowDay(event.target.value)}>
+                  {WEEKDAYS.map((weekday, dayOfWeek) => (
+                    <option key={weekday} value={String(dayOfWeek)}>{weekday}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Start
+                <input type="time" value={newWindowStart} onChange={(event) => setNewWindowStart(event.target.value)} />
+              </label>
+              <label>
+                End
+                <input type="time" value={newWindowEnd} onChange={(event) => setNewWindowEnd(event.target.value)} />
+              </label>
+              <button type="submit" disabled={busyId === "add-window"}>Add hours</button>
+            </form>
+          </section>
+          <section className="portal-card">
+            <div className="section-title">
+              <Eyebrow>DATE OVERRIDES</Eyebrow>
+              <h2>Holidays and one-off days.</h2>
+            </div>
+            <form
+              className="propose-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                saveOverride();
+              }}
+            >
+              <label>
+                Date
+                <input type="date" value={overrideDate} onChange={(event) => setOverrideDate(event.target.value)} />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={overrideClosed}
+                  onChange={(event) => setOverrideClosed(event.target.checked)}
+                />{" "}
+                Closed all day
+              </label>
+              {!overrideClosed && (
+                <>
+                  <label>
+                    Open from
+                    <input type="time" value={overrideStart} onChange={(event) => setOverrideStart(event.target.value)} />
+                  </label>
+                  <label>
+                    Open until
+                    <input type="time" value={overrideEnd} onChange={(event) => setOverrideEnd(event.target.value)} />
+                  </label>
+                </>
+              )}
+              <label>
+                Note
+                <input
+                  type="text"
+                  value={overrideNote}
+                  placeholder="Holiday, training day…"
+                  onChange={(event) => setOverrideNote(event.target.value)}
+                />
+              </label>
+              <button type="submit" disabled={busyId === "save-override"}>Save override</button>
+            </form>
+            {overrides.map((override) => (
+              <div className="request-card" key={override.id}>
+                <div>
+                  <small>{override.isClosed ? "Closed" : "Custom hours"}</small>
+                  <h3>{override.date}</h3>
+                  <p>
+                    {override.isClosed
+                      ? "Not bookable"
+                      : `${minutesToTimeInput(override.startMinutes ?? 0)} – ${minutesToTimeInput(override.endMinutes ?? 0)}`}
+                    {override.note ? ` · ${override.note}` : ""}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={busyId === `rm-override-${override.id}`}
+                  onClick={() => removeOverride(override.id)}
+                >Remove override</button>
+              </div>
+            ))}
           </section>
           <section className="portal-card">
             <div className="section-title">

@@ -16,7 +16,7 @@ test("wires member booking APIs and keeps a labeled demo fallback", () => {
     "/api/bookings/reschedule",
     "/api/bookings/accept-proposal",
     "/api/bookings/decline-proposal",
-    "confirmServerBooking",
+    "handleSlotBooked",
     "cancelServerBooking",
     "This time works",
     "Not this time",

@@ -3,10 +3,12 @@ import {rememberMember} from "../payments/ledger";
 import {applyStripeEnvToProcess, isStripeReady, readStripeEnv, type StripeEnv} from "../payments/env";
 import {
   acceptProposedBookingTime,
+  assignMemberBooking,
   BookingError,
   cancelMemberBooking,
   completeMemberBooking,
   createMemberBooking,
+  createScheduledMemberBooking,
   declineProposedBookingTime,
   InsufficientCreditsError,
   listMemberBookings,
@@ -57,6 +59,9 @@ export async function handleBookingsFetch(request: Request, runtimeEnv: RuntimeE
   if (url.pathname === "/api/bookings" && request.method === "POST") {
     return handleCreate(request, env);
   }
+  if (url.pathname === "/api/bookings/assign" && request.method === "POST") {
+    return handleAssign(request, env);
+  }
   if (url.pathname === "/api/bookings/reschedule" && request.method === "POST") {
     return handleReschedule(request);
   }
@@ -105,6 +110,8 @@ async function handleCreate(request: Request, env: StripeEnv): Promise<Response>
     packageName?: string;
     packageItem?: string;
     availabilityId?: string;
+    providerId?: string;
+    slotStart?: string;
   };
   try {
     body = (await request.json()) as typeof body;
@@ -113,6 +120,27 @@ async function handleCreate(request: Request, env: StripeEnv): Promise<Response>
   }
 
   try {
+    if (body.providerId && body.slotStart) {
+      const result = await createScheduledMemberBooking({
+        member,
+        serviceId: body.serviceId ?? "",
+        mode: body.mode,
+        providerId: body.providerId,
+        slotStart: body.slotStart,
+        packageName: body.packageName,
+        packageItem: body.packageItem,
+        enforceCredits: isStripeReady(env),
+      });
+      const bookings = await listMemberBookings(member.id);
+      return json({
+        source: "server",
+        booking: toUiBooking(result.booking),
+        bookings: bookings.map(toUiBooking),
+        provider: result.provider,
+        creditsApplied: result.creditsApplied,
+        wallet: {availableCredits: result.availableCredits},
+      });
+    }
     const result = await createMemberBooking({
       member,
       serviceId: body.serviceId ?? "",
@@ -130,6 +158,39 @@ async function handleCreate(request: Request, env: StripeEnv): Promise<Response>
       bookings: bookings.map(toUiBooking),
       creditsApplied: result.creditsApplied,
       wallet: {availableCredits: result.availableCredits},
+    });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}
+
+async function handleAssign(request: Request, env: StripeEnv): Promise<Response> {
+  const member = await requireMember(request);
+  if (!member) {
+    return json({source: "demo", error: "Sign in to persist this reservation."}, 401);
+  }
+
+  let body: {serviceId?: string; startISO?: string; mode?: string};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({source: "server", error: "Choose a service and time."}, 400);
+  }
+
+  try {
+    const result = await assignMemberBooking({
+      member,
+      serviceId: body.serviceId ?? "",
+      startISO: body.startISO ?? "",
+      mode: body.mode,
+      enforceCredits: isStripeReady(env),
+    });
+    const bookings = await listMemberBookings(member.id);
+    return json({
+      source: "server",
+      booking: toUiBooking(result.booking),
+      bookings: bookings.map(toUiBooking),
+      provider: result.provider,
     });
   } catch (error) {
     return errorResponse(error);

@@ -1,7 +1,8 @@
 import {desc, eq, sql} from "drizzle-orm";
-import type {ProviderApplication, ProviderApplicationStatus, ProviderDocStatus, ProviderLicenseType} from "../domain/types";
+import type {ProviderAccount, ProviderApplication, ProviderApplicationStatus, ProviderDocStatus, ProviderLicenseType} from "../domain/types";
 import {getDb} from "./index";
 import {providerApplications} from "./schema";
+import {liveServiceId, serviceKeysForLicense} from "../providers/catalog";
 
 function parseList(value: string): string[] {
   try {
@@ -135,6 +136,42 @@ export async function insertProviderApplication(application: ProviderApplication
 }
 
 export type ProviderApplicationPatch = Partial<Pick<ProviderApplication, "status" | "reviewNote" | "docsLicenseProof" | "docsInsurance" | "updatedAt">>;
+
+export function providerAccountFromApplication(application: ProviderApplication): ProviderAccount | null {
+  const email = application.email.trim().toLowerCase();
+  if (!email) return null;
+  const now = new Date().toISOString();
+  return {
+    id: `prov_app_${application.id}`,
+    email,
+    displayName: application.fullName,
+    practiceId: application.id,
+    practiceName: application.fullName,
+    status: "approved",
+    serviceIds: serviceKeysForLicense(application.licenseType).map((key) =>
+      liveServiceId(application.id, key),
+    ),
+    createdAt: application.createdAt ?? now,
+    updatedAt: now,
+  };
+}
+
+export async function insertProviderAccountFromApplication(
+  application: ProviderApplication,
+): Promise<ProviderAccount | null> {
+  const account = providerAccountFromApplication(application);
+  if (!account) return null;
+  try {
+    const db = await import("./provider");
+    await db.ensureProviderWorkspaceSchema();
+    const ok = await db.upsertProviderAccountRow(account);
+    return ok ? account : null;
+  } catch {
+    // D1 is optional; provider/service.ts still resolves approved applications
+    // to provider accounts dynamically when the provider signs in.
+    return null;
+  }
+}
 
 export async function updateProviderApplication(id: string, patch: ProviderApplicationPatch): Promise<ProviderApplication | null> {
   return withProvidersDb(async (db) => {

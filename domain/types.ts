@@ -59,7 +59,7 @@ export type ProviderAccount={
   createdAt:string;
   updatedAt:string;
 };
-export type AppointmentRequestStatus="open"|"accepted"|"declined"|"proposed"|"cancelled";
+export type AppointmentRequestStatus="open"|"accepted"|"declined"|"proposed"|"cancelled"|"assigned";
 export type AppointmentRequest={
   id:ID;
   bookingId:ID;
@@ -98,7 +98,7 @@ export type ProviderBlock={
   note?:string;
   createdAt:string;
 };
-export type BookingAssignment="unassigned"|"accepted"|"proposed"|"declined";
+export type BookingAssignment="unassigned"|"accepted"|"proposed"|"declined"|"assigned";
 export type ProviderCredential={id:ID;providerId:ID;label:string;status:"prototype"|"pending_review"|"verified"};
 export type Service={id:ID;providerId:ID;name:string;mode:"home"|"virtual"|"location";standardPrice:number;memberPrice:number};
 export type AppointmentAvailability={id:ID;serviceId:ID;startsAt:string;status:"open"|"held"|"booked"};
@@ -112,8 +112,10 @@ export type Booking={
   creditsCharged:number;
   serviceName:string;
   provider:string;
+  providerId?:ID;
   date:string;
   startsAt?:string;
+  slotEnd?:string;
   mode:string;
   packageName?:string;
   packageItem?:string;

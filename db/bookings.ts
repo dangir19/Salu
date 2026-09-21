@@ -10,9 +10,11 @@ function bookingFromRow(row: typeof bookings.$inferSelect): Booking {
     serviceId: row.serviceId,
     serviceName: row.serviceName,
     provider: row.provider,
+    providerId: row.providerId ?? undefined,
     availabilityId: row.availabilityId ?? undefined,
     date: row.date,
     startsAt: row.startsAt ?? undefined,
+    slotEnd: row.slotEnd ?? undefined,
     mode: row.mode,
     status: row.status as Booking["status"],
     creditsCharged: row.creditsCharged,
@@ -55,6 +57,15 @@ export async function ensureBookingsSchema(): Promise<boolean> {
     } catch {
       // Index already exists, or the D1 dialect rejected IF NOT EXISTS.
     }
+    // drizzle/0007 adds these columns on existing databases; make fresh
+    // databases match the migrated shape as well.
+    for (const column of ["ALTER TABLE bookings ADD COLUMN provider_id text", "ALTER TABLE bookings ADD COLUMN slot_end text"]) {
+      try {
+        await db.run(sql.raw(column));
+      } catch {
+        // Column already exists.
+      }
+    }
     return true;
   }));
 }
@@ -81,6 +92,17 @@ export async function listBookingsForProvider(providerName: string): Promise<Boo
   });
 }
 
+export async function listBookingsForProviderId(providerId: string): Promise<Booking[] | null> {
+  return withBookingsDb(async (db) => {
+    const rows = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.providerId, providerId))
+      .orderBy(desc(bookings.createdAt));
+    return rows.map(bookingFromRow);
+  });
+}
+
 export async function getBookingById(id: string): Promise<Booking | null> {
   return withBookingsDb(async (db) => {
     const rows = await db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
@@ -96,9 +118,11 @@ export async function insertBooking(booking: Booking): Promise<boolean> {
       serviceId: booking.serviceId,
       serviceName: booking.serviceName,
       provider: booking.provider,
+      providerId: booking.providerId ?? null,
       availabilityId: booking.availabilityId ?? null,
       date: booking.date,
       startsAt: booking.startsAt ?? null,
+      slotEnd: booking.slotEnd ?? null,
       mode: booking.mode,
       status: booking.status,
       creditsCharged: booking.creditsCharged,
@@ -119,6 +143,8 @@ export async function updateBooking(id: string, patch: Partial<Booking>): Promis
     const next = {
       date: patch.date ?? current.date,
       startsAt: patch.startsAt === "" ? null : (patch.startsAt ?? current.startsAt),
+      slotEnd: patch.slotEnd === "" ? null : (patch.slotEnd ?? current.slotEnd),
+      providerId: patch.providerId === "" ? null : (patch.providerId ?? current.providerId),
       status: patch.status ?? current.status,
       updatedAt: patch.updatedAt ?? new Date().toISOString(),
     };

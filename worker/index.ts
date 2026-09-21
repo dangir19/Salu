@@ -69,6 +69,16 @@ const worker = {
       return handleBookingsFetch(request, env as unknown as Record<string, string | undefined>);
     }
 
+    if (url.pathname === "/api/providers/slots") {
+      const {handleProviderSlotsFetch} = await import("../providers/slots");
+      return handleProviderSlotsFetch(request);
+    }
+
+    if (url.pathname === "/api/admin" || url.pathname.startsWith("/api/admin/")) {
+      const {handleAdminFetch} = await import("../admin/handlers");
+      return handleAdminFetch(request, env as unknown as Record<string, string | undefined>);
+    }
+
     if (url.pathname.startsWith("/api/providers")) {
       const {handleProvidersFetch} = await import("../providers/handlers");
       return handleProvidersFetch(request, env as unknown as Record<string, string | undefined>);

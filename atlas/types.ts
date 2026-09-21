@@ -18,6 +18,10 @@ export type AtlasPending = {
   mode: string;
   packageName?: string;
   packageItem?: string;
+  /** Real scheduling-engine slot details, set when the pending window came from check_availability. */
+  providerId?: string;
+  startISO?: string;
+  endISO?: string;
 };
 
 export type AtlasEntitlement = {
@@ -43,6 +47,12 @@ export type AtlasWindow = {
   date: string;
   mode: string;
   label: string;
+  /** Real scheduling-engine slot details, present when the window came from check_availability. */
+  providerId?: string;
+  providerName?: string;
+  slotServiceId?: string;
+  startISO?: string;
+  endISO?: string;
 };
 
 export type AtlasToolTrace = {

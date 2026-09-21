@@ -1,13 +1,18 @@
 import {packages, services, topProviders} from "../domain/mock-data";
 import {creditsForService, findCatalogService} from "../bookings/catalog";
 import {
+  assignMemberBooking,
+  BookingError,
   createMemberBooking,
+  createScheduledMemberBooking,
   listMemberBookings,
   toUiBooking,
   type UiBooking,
 } from "../bookings/service";
-import type {Member} from "../domain/types";
-import {toServiceMatch, windowsForService} from "./availability";
+import {parseLiveServiceId} from "../providers/catalog";
+import {schedulingProviderId} from "../scheduling/slots";
+import type {Booking, Member} from "../domain/types";
+import {expandServiceSlotTargets, realWindowsForService, toServiceMatch} from "./availability";
 import type {AtlasEntitlement, AtlasServiceMatch, AtlasToolName, AtlasWindow} from "./types";
 
 export type DiscoverArgs = {query?: string; category?: string; limit?: number};
@@ -18,6 +23,10 @@ export type CreateBookingArgs = {
   mode?: string;
   packageName?: string;
   packageItem?: string;
+  /** Provider account id from a check_availability window. When set with startISO, locks that exact slot. */
+  providerId?: string;
+  /** Exact slot start (ISO 8601) from a check_availability window. Without providerId, Atlas auto-assigns a free provider. */
+  startISO?: string;
 };
 
 export type ToolContext = {
@@ -28,7 +37,7 @@ export type ToolContext = {
 };
 
 export type DiscoverResult = {matches: AtlasServiceMatch[]};
-export type AvailabilityResult = {windows: AtlasWindow[]; service: AtlasServiceMatch | null};
+export type AvailabilityResult = {windows: AtlasWindow[]; service: AtlasServiceMatch | null; note?: string};
 export type CreateBookingResult = {
   booking: UiBooking;
   source: "demo" | "server";
@@ -57,7 +66,7 @@ export const ATLAS_TOOL_SCHEMAS = [
     type: "function" as const,
     function: {
       name: "check_availability",
-      description: "Return open catalog windows for a service. Inventory is the Miami catalog, not a held-slot table.",
+      description: "Check REAL provider availability for a catalog service. Returns open slots from the live scheduling engine (provider, providerId, startISO/endISO, label) for the next 14 days. An empty windows list means nothing is open — never invent times.",
       parameters: {
         type: "object",
         properties: {
@@ -71,15 +80,17 @@ export const ATLAS_TOOL_SCHEMAS = [
     type: "function" as const,
     function: {
       name: "create_booking",
-      description: "Create a member reservation through the booking service (same path as POST /api/bookings).",
+      description: "Create a member reservation through the booking service. Pass providerId + startISO from a check_availability window to lock that exact slot (409 if it was just taken). Pass startISO without providerId and Atlas auto-assigns a free provider. Without startISO it books by display date (legacy/demo path).",
       parameters: {
         type: "object",
         properties: {
           serviceId: {type: "string"},
-          date: {type: "string", description: "Display window such as Today · 6:00 PM."},
+          date: {type: "string", description: "Display window such as the label from check_availability."},
           mode: {type: "string"},
           packageName: {type: "string"},
           packageItem: {type: "string"},
+          providerId: {type: "string", description: "Provider account id from a check_availability window."},
+          startISO: {type: "string", description: "Exact slot start (ISO 8601) from a check_availability window."},
         },
         required: ["serviceId", "date"],
       },
@@ -160,10 +171,16 @@ export function discoverServices(args: DiscoverArgs): DiscoverResult {
   };
 }
 
-export function checkAvailability(args: AvailabilityArgs): AvailabilityResult {
+export async function checkAvailability(args: AvailabilityArgs): Promise<AvailabilityResult> {
+  const serviceId = args.serviceId.trim();
+  const service = toServiceMatch(serviceId);
+  const windows = service ? await realWindowsForService(serviceId) : [];
   return {
-    service: toServiceMatch(args.serviceId),
-    windows: windowsForService(args.serviceId),
+    service,
+    windows,
+    note: service && !windows.length
+      ? `No open provider slots for ${service.name} in the next 14 days. Real provider calendars were checked — nothing was invented.`
+      : undefined,
   };
 }
 
@@ -201,14 +218,107 @@ function demoBooking(args: CreateBookingArgs, planId: string, pack?: {packageNam
   };
 }
 
+function sameServiceKey(a: string, b: string): boolean {
+  if (a === b) return true;
+  const keyA = parseLiveServiceId(a)?.serviceKey ?? a;
+  const keyB = parseLiveServiceId(b)?.serviceKey ?? b;
+  return keyA === keyB;
+}
+
 export async function createBooking(args: CreateBookingArgs, context: ToolContext): Promise<CreateBookingResult> {
   const service = findCatalogService(args.serviceId);
   if (!service) throw new Error("That service is not on the Salu menu.");
   const pack = args.packageName
     ? {packageName: args.packageName, packageItem: args.packageItem ?? service.name}
     : packageForService(service.name, context.entitlements);
-  const date = args.date.trim();
+  const startISO = args.startISO?.trim() || undefined;
+  const providerId = args.providerId?.trim() || undefined;
   const mode = (args.mode ?? `${service.mode} · ${service.area}`).trim();
+
+  // Real scheduling-engine path: lock an exact free slot for a signed-in member.
+  if (context.member && startISO) {
+    const member = context.member;
+    const startMs = Date.parse(startISO);
+    if (!Number.isFinite(startMs)) throw new Error("Choose a time for this reservation.");
+
+    const existing = await listMemberBookings(member.id);
+    const duplicate = existing.find((row) =>
+      row.startsAt === startISO &&
+      sameServiceKey(row.serviceId, args.serviceId) &&
+      row.status !== "cancelled" &&
+      row.status !== "completed",
+    );
+    if (duplicate) {
+      return {
+        booking: toUiBooking(duplicate),
+        source: "server",
+        creditsApplied: false,
+        availableCredits: 0,
+        bookings: existing.map(toUiBooking),
+      };
+    }
+
+    const targets = await expandServiceSlotTargets(args.serviceId);
+    let scheduled: {
+      booking: Booking;
+      provider: {id: string; name: string};
+      creditsApplied: boolean;
+      availableCredits: number;
+    };
+    if (providerId) {
+      const accountId = schedulingProviderId(providerId);
+      const target = targets.find((entry) => entry.providerId === accountId);
+      if (!target) {
+        throw new BookingError("That provider is not offering this service right now.", 404);
+      }
+      const result = await createScheduledMemberBooking({
+        member,
+        serviceId: target.serviceId,
+        mode,
+        providerId: accountId,
+        slotStart: startISO,
+        packageName: pack?.packageName,
+        packageItem: pack?.packageItem,
+        enforceCredits: context.enforceCredits,
+      });
+      scheduled = result;
+    } else {
+      const live = parseLiveServiceId(args.serviceId);
+      const engineServiceId = live ? args.serviceId : targets[0]?.serviceId;
+      if (!engineServiceId) {
+        throw new BookingError("No provider is free at that time. Pick another slot.", 409);
+      }
+      const assigned = await assignMemberBooking({
+        member,
+        serviceId: engineServiceId,
+        startISO,
+        mode,
+        enforceCredits: context.enforceCredits,
+      });
+      const billing = await import("../payments/ledger").then((mod) => mod.getMemberBilling(member));
+      scheduled = {
+        booking: assigned.booking,
+        provider: assigned.provider,
+        creditsApplied: false,
+        availableCredits: billing.wallet.availableCredits,
+      };
+    }
+
+    const bookings = await listMemberBookings(member.id);
+    return {
+      booking: {...toUiBooking(scheduled.booking), provider: scheduled.provider.name},
+      source: "server",
+      creditsApplied: scheduled.creditsApplied,
+      availableCredits: scheduled.availableCredits,
+      bookings: bookings.map(toUiBooking),
+    };
+  }
+
+  let date = args.date.trim();
+  if (!date && startISO) {
+    const windows = await realWindowsForService(args.serviceId);
+    date = windows.find((window) => window.startISO === startISO)?.label ?? "";
+  }
   if (!date) throw new Error("Choose a time for this reservation.");
 
   if (context.member) {
@@ -276,6 +386,8 @@ export async function executeTool(
       mode: typeof args.mode === "string" ? args.mode : undefined,
       packageName: typeof args.packageName === "string" ? args.packageName : undefined,
       packageItem: typeof args.packageItem === "string" ? args.packageItem : undefined,
+      providerId: typeof args.providerId === "string" ? args.providerId : undefined,
+      startISO: typeof args.startISO === "string" ? args.startISO : undefined,
     }, context);
   }
   throw new Error(`Unknown Atlas tool: ${name}`);

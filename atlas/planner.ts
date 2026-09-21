@@ -1,8 +1,8 @@
 import {findCatalogService} from "../bookings/catalog";
-import {pickWindow, windowsForService} from "./availability";
+import {pickWindow, realWindowsForService} from "./availability";
 import {assessSafety, educationalReply} from "./safety";
 import {discoverServices, resolveServiceId} from "./tools";
-import type {AtlasPending, AtlasSafetyKind, AtlasToolName} from "./types";
+import type {AtlasPending, AtlasSafetyKind, AtlasToolName, AtlasWindow} from "./types";
 
 export type PlannedTool = {name: AtlasToolName; args: Record<string, unknown>};
 
@@ -24,11 +24,22 @@ function lastMemberText(history: {role: string; content: string}[] = []): string
   return [...history].reverse().find((entry) => entry.role === "member")?.content ?? "";
 }
 
-export function planAtlasTurn(input: {
+function pendingFromWindow(serviceId: string, window: AtlasWindow, fallbackMode: string): AtlasPending {
+  return {
+    serviceId,
+    date: window.date,
+    mode: window.mode || fallbackMode,
+    providerId: window.providerId,
+    startISO: window.startISO,
+    endISO: window.endISO,
+  };
+}
+
+export async function planAtlasTurn(input: {
   message: string;
   history?: {role: string; content: string}[];
   pending?: AtlasPending | null;
-}): AtlasPlan {
+}): Promise<AtlasPlan> {
   const message = input.message.trim();
   const safety = assessSafety(message);
   if (safety.kind === "emergency") {
@@ -40,10 +51,11 @@ export function planAtlasTurn(input: {
   const asap = ASAP_INTENT.test(message);
   const serviceId = resolveServiceId(message) ?? input.pending?.serviceId ?? resolveServiceId(lastMemberText(input.history));
   const service = serviceId ? findCatalogService(serviceId) : null;
-  const windows = service ? windowsForService(service.id) : [];
+  const windows = service ? await realWindowsForService(service.id) : [];
   const window = service
     ? pickWindow(windows, message, {asap, pendingDate: confirm ? input.pending?.date : undefined})
     : null;
+  const fallbackMode = service ? `${service.mode} · ${service.area}` : "";
 
   if (safety.kind === "clinical_boundary" && !(book && service && (window || asap || confirm))) {
     const matches = discoverServices({query: message, limit: 3});
@@ -63,24 +75,49 @@ export function planAtlasTurn(input: {
 
   if (book && service && (window || (confirm && input.pending))) {
     const chosen = window ?? (input.pending
-      ? {serviceId: input.pending.serviceId, date: input.pending.date, mode: input.pending.mode, id: "pending", label: input.pending.date}
+      ? {
+        serviceId: input.pending.serviceId,
+        date: input.pending.date,
+        mode: input.pending.mode,
+        providerId: input.pending.providerId,
+        startISO: input.pending.startISO,
+        endISO: input.pending.endISO,
+      }
       : null);
     if (chosen) {
+      const pending: AtlasPending = {
+        serviceId: service.id,
+        date: chosen.date,
+        mode: chosen.mode,
+        providerId: chosen.providerId,
+        startISO: chosen.startISO,
+        endISO: chosen.endISO,
+      };
       return {
         safety: safety.kind,
         tools: [
           {name: "discover_services", args: {query: service.name, limit: 1}},
           {name: "check_availability", args: {serviceId: service.id}},
-          {name: "create_booking", args: {serviceId: service.id, date: chosen.date, mode: chosen.mode}},
+          {
+            name: "create_booking",
+            args: {
+              serviceId: service.id,
+              date: chosen.date,
+              mode: chosen.mode,
+              ...(chosen.providerId ? {providerId: chosen.providerId} : {}),
+              ...(chosen.startISO ? {startISO: chosen.startISO} : {}),
+            },
+          },
         ],
         replyHint: "confirm",
-        pending: {serviceId: service.id, date: chosen.date, mode: chosen.mode},
+        pending,
         autoBook: true,
       };
     }
   }
 
   if (book && service) {
+    const firstWindow = windows[0];
     return {
       safety: safety.kind,
       tools: [
@@ -88,11 +125,13 @@ export function planAtlasTurn(input: {
         {name: "check_availability", args: {serviceId: service.id}},
       ],
       replyHint: "windows",
-      pending: {
-        serviceId: service.id,
-        date: windows[0]?.date ?? service.next,
-        mode: windows[0]?.mode ?? `${service.mode} · ${service.area}`,
-      },
+      pending: firstWindow
+        ? pendingFromWindow(service.id, firstWindow, fallbackMode)
+        : {
+          serviceId: service.id,
+          date: service.next,
+          mode: fallbackMode,
+        },
       autoBook: false,
     };
   }
@@ -110,9 +149,11 @@ export function planAtlasTurn(input: {
     safety: safety.kind,
     tools,
     replyHint: education ?? (shouldDiscover ? "discover" : "general"),
-    pending: first
-      ? {serviceId: first.id, date: first.next, mode: `${first.mode} · ${first.area}`}
-      : input.pending ?? null,
+    pending: service && windows[0]
+      ? pendingFromWindow(service.id, windows[0], fallbackMode)
+      : first
+        ? {serviceId: first.id, date: first.next, mode: `${first.mode} · ${first.area}`}
+        : input.pending ?? null,
     autoBook: false,
   };
 }
@@ -124,6 +165,8 @@ export function composeAtlasText(input: {
   booked?: {serviceName: string; date: string; mode: string; credits: number; packageName?: string} | null;
   matches: {name: string; next: string}[];
   windows: {date: string; mode: string}[];
+  toolError?: string | null;
+  note?: string | null;
 }): string {
   if (input.safety === "emergency") {
     return educationalReply(input.message) ?? input.hint;
@@ -138,10 +181,17 @@ export function composeAtlasText(input: {
     const extra = input.matches[0] ? ` I can coordinate ${input.matches[0].name} if you want a reservation.` : "";
     return `${input.hint}${extra}`;
   }
+  if (input.toolError) {
+    return `I ran into a snag: ${input.toolError}`;
+  }
   if (input.hint === "windows" && input.windows.length) {
     const name = input.matches[0]?.name ?? "that service";
     const options = input.windows.slice(0, 3).map((window) => window.date).join(", ");
-    return `I can reserve ${name}. Open catalog windows: ${options}. Tell me which time to confirm — this is general wellness coordination, not a diagnosis.`;
+    return `I can reserve ${name}. Open slots: ${options}. Tell me which time to confirm — this is general wellness coordination, not a diagnosis.`;
+  }
+  if (input.hint === "windows" && !input.windows.length) {
+    const name = input.matches[0]?.name ?? "that service";
+    return input.note ?? `I couldn't find an open slot for ${name} in the next two weeks. Want me to suggest a similar service instead?`;
   }
   const education = educationalReply(input.message);
   if (education) return education;

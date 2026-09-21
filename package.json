@@ -10,7 +10,7 @@
     "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "deploy": "WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler deploy",
-    "test": "pnpm run build && node --test tests/rendered-html.test.mjs tests/auth.test.mjs tests/payments-source.test.mjs tests/bookings-source.test.mjs tests/atlas-source.test.mjs tests/providers-source.test.mjs tests/provider-source.test.mjs tests/connect-source.test.mjs tests/deploy-config.test.mjs && node --experimental-strip-types --test tests/auth-identity.test.ts && node --experimental-strip-types --import ./tests/register-ts-resolve.mjs --test tests/auth-credentials.test.ts tests/payments.test.ts tests/bookings.test.ts tests/atlas.test.ts tests/providers.test.ts tests/provider.test.ts tests/connect.test.ts",
+    "test": "pnpm run build && node --test tests/rendered-html.test.mjs tests/auth.test.mjs tests/payments-source.test.mjs tests/bookings-source.test.mjs tests/atlas-source.test.mjs tests/providers-source.test.mjs tests/provider-source.test.mjs tests/connect-source.test.mjs tests/deploy-config.test.mjs && node --experimental-strip-types --test tests/auth-identity.test.ts && node --experimental-strip-types --import ./tests/register-ts-resolve.mjs --test tests/auth-credentials.test.ts tests/payments.test.ts tests/bookings.test.ts tests/atlas.test.ts tests/providers.test.ts tests/provider.test.ts tests/connect.test.ts tests/scheduling.test.ts tests/admin.test.ts",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
@@ -47,6 +47,10 @@
   },
   "type": "module",
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild", "sharp", "workerd"]
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp",
+      "workerd"
+    ]
   }
 }

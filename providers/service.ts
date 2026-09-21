@@ -229,6 +229,7 @@ export async function submitApplication(input: {
 export async function updateApplicationStatus(input: {
   id?: string;
   status?: string;
+  action?: string;
   reviewNote?: string;
   docsLicenseProof?: string;
   docsInsurance?: string;
@@ -238,7 +239,18 @@ export async function updateApplicationStatus(input: {
   const current = await storedApplication(id);
   if (!current) throw new ProviderError("That application is not in the Miami pipeline.", 404);
 
-  const status = input.status?.trim();
+  const action = input.action?.trim().toLowerCase();
+  let status = input.status?.trim();
+  if (action) {
+    if (action !== "request-info") {
+      throw new ProviderError("Unknown review action.");
+    }
+    const note = input.reviewNote?.trim() ?? "";
+    if (!note) {
+      throw new ProviderError("Add a note telling the applicant what you still need.");
+    }
+    status = "under_review";
+  }
   if (status && !APPLICATION_STATUSES.includes(status as ProviderApplicationStatus)) {
     throw new ProviderError("Status must be submitted, under review, approved, or rejected.");
   }
@@ -258,6 +270,15 @@ export async function updateApplicationStatus(input: {
     updatedAt: new Date().toISOString(),
   };
   await persistApplication(next);
-  if (next.status === "approved") await listApprovedCatalog();
+  if (next.status === "approved") {
+    await listApprovedCatalog();
+    try {
+      const db = await import("../db/providers");
+      await db.insertProviderAccountFromApplication(next);
+    } catch {
+      // Approved applications still resolve to provider accounts dynamically
+      // when the provider signs in with their native member account.
+    }
+  }
   return next;
 }

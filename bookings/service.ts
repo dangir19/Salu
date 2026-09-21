@@ -28,7 +28,7 @@ export type UiBooking = {
   status: UiBookingStatus;
   packageName?: string;
   packageItem?: string;
-  assignment?: "unassigned" | "accepted" | "proposed" | "declined";
+  assignment?: "unassigned" | "accepted" | "proposed" | "declined" | "assigned";
   proposedDate?: string;
 };
 
@@ -86,7 +86,7 @@ async function attachRequest(booking: Booking): Promise<Booking> {
       ...booking,
       assignment: request.status === "open" || request.status === "cancelled"
         ? "unassigned"
-        : request.status === "accepted" || request.status === "proposed" || request.status === "declined"
+        : request.status === "accepted" || request.status === "proposed" || request.status === "declined" || request.status === "assigned"
           ? request.status
           : "unassigned",
       proposedDate: request.proposedDate,
@@ -131,8 +131,31 @@ async function storedBooking(id: string): Promise<Booking | null> {
   return memory.get(id) ?? null;
 }
 
-export async function listProviderBookings(providerName: string): Promise<Booking[]> {
+/**
+ * Bookings that hold a real time slot for one provider, keyed by the
+ * provider account id used by the scheduling engine. Used for overlap
+ * checks when generating free slots.
+ */
+export async function listScheduledBookingsForProvider(providerId: string): Promise<Booking[]> {
   try {
+    const db = await import("../db/bookings");
+    await db.ensureBookingsSchema();
+    const persisted = await db.listBookingsForProviderId(providerId);
+    if (persisted) {
+      for (const row of persisted) memory.set(row.id, row);
+      return persisted.filter((row) => row.status !== "cancelled" && row.status !== "completed" && row.startsAt);
+    }
+  } catch {
+    // Memory fallback.
+  }
+  return sortBookings(
+    [...memory.values()].filter(
+      (row) => row.providerId === providerId && row.status !== "cancelled" && row.status !== "completed" && row.startsAt,
+    ),
+  );
+}
+
+export async function listProviderBookings(providerName: string): Promise<Booking[]> {  try {
     const db = await import("../db/bookings");
     await db.ensureBookingsSchema();
     const persisted = await db.listBookingsForProvider(providerName);
@@ -169,6 +192,9 @@ export async function createMemberBooking(input: {
   packageName?: string;
   packageItem?: string;
   availabilityId?: string;
+  providerId?: string;
+  startsAt?: string;
+  slotEnd?: string;
   enforceCredits: boolean;
 }): Promise<{booking: Booking; creditsApplied: boolean; availableCredits: number}> {
   const service = findCatalogService(input.serviceId)
@@ -201,8 +227,11 @@ export async function createMemberBooking(input: {
     serviceId: service.id,
     serviceName: service.name,
     provider: service.provider,
+    providerId: input.providerId,
     availabilityId: input.availabilityId,
     date,
+    startsAt: input.startsAt,
+    slotEnd: input.slotEnd,
     mode,
     status: "confirmed",
     creditsCharged,
@@ -418,3 +447,158 @@ export async function cancelMemberBooking(input: {
 }
 
 export {InsufficientCreditsError};
+
+/**
+ * Book a concrete free slot with a specific provider. Re-verifies the slot
+ * against the scheduling engine right before writing so two members cannot
+ * take the same time (409 on conflict).
+ */
+export async function createScheduledMemberBooking(input: {
+  member: Member;
+  serviceId: string;
+  mode?: string;
+  providerId: string;
+  slotStart: string;
+  packageName?: string;
+  packageItem?: string;
+  enforceCredits: boolean;
+}): Promise<{booking: Booking; provider: {id: string; name: string}; creditsApplied: boolean; availableCredits: number}> {
+  const {schedulingProviderId, getFreeSlots} = await import("../scheduling/slots");
+  const {durationMinutesForService, findCatalogService} = await import("./catalog");
+  const service = findCatalogService(input.serviceId);
+  if (!service) throw new BookingError("That service is not on the Salu menu.", 404);
+
+  const durationMinutes = durationMinutesForService(input.serviceId);
+  const startMs = Date.parse(input.slotStart);
+  if (!Number.isFinite(startMs)) throw new BookingError("Choose a time for this reservation.");
+
+  const accountId = schedulingProviderId(input.providerId);
+  const slots = await getFreeSlots({
+    providerId: accountId,
+    serviceId: input.serviceId,
+    fromISO: new Date(startMs).toISOString(),
+    toISO: new Date(startMs + durationMinutes * 60000).toISOString(),
+    durationMinutes,
+  });
+  const slot = slots.find((candidate) => Date.parse(candidate.startISO) === startMs);
+  if (!slot) {
+    throw new BookingError("That time was just taken. Pick another slot.", 409);
+  }
+
+  const result = await createMemberBooking({
+    member: input.member,
+    serviceId: input.serviceId,
+    date: slot.label,
+    mode: input.mode?.trim() || slot.mode,
+    packageName: input.packageName,
+    packageItem: input.packageItem,
+    providerId: accountId,
+    startsAt: slot.startISO,
+    slotEnd: slot.endISO,
+    enforceCredits: input.enforceCredits,
+  });
+
+  const provider = await import("../provider/service");
+  await provider.createAssignedRequestFromBooking({
+    booking: result.booking,
+    member: input.member,
+    providerId: accountId,
+  });
+
+  return {
+    booking: {...result.booking, assignment: "assigned" as const},
+    provider: {id: accountId, name: slot.providerName},
+    creditsApplied: result.creditsApplied,
+    availableCredits: result.availableCredits,
+  };
+}
+
+/**
+ * Assignment engine: given a service and an exact start time, find every
+ * approved provider offering that service with the slot free, then pick the
+ * one with the fewest bookings that day (tie-break: earliest created).
+ */
+export async function assignMemberBooking(input: {
+  member: Member;
+  serviceId: string;
+  startISO: string;
+  mode?: string;
+  enforceCredits: boolean;
+}): Promise<{booking: Booking; provider: {id: string; name: string}}> {
+  const {getFreeSlots, nyDayOf} = await import("../scheduling/slots");
+  const {durationMinutesForService, findCatalogService} = await import("./catalog");
+  const {listApplications} = await import("../providers/service");
+  const service = findCatalogService(input.serviceId);
+  if (!service) throw new BookingError("That service is not on the Salu menu.", 404);
+
+  const durationMinutes = durationMinutesForService(input.serviceId);
+  const startMs = Date.parse(input.startISO);
+  if (!Number.isFinite(startMs)) throw new BookingError("Choose a time for this reservation.");
+
+  // Live service ids are per application (live~<appId>~<key>), so expand the
+  // request to every approved provider offering the same service key.
+  const {parseLiveServiceId} = await import("../providers/catalog");
+  const {schedulingProviderId} = await import("../scheduling/slots");
+  const {listApprovedCatalog} = await import("../providers/service");
+  const catalog = await listApprovedCatalog();
+  const live = parseLiveServiceId(input.serviceId);
+  const targets: Array<{providerId: string; serviceId: string}> = [];
+  if (live) {
+    for (const provider of catalog.providers) {
+      const match = catalog.services.find(
+        (service) => service.providerId === provider.id && parseLiveServiceId(service.id)?.serviceKey === live.serviceKey,
+      );
+      if (match) targets.push({providerId: schedulingProviderId(provider.id), serviceId: match.id});
+    }
+  } else {
+    targets.push({providerId: "", serviceId: input.serviceId});
+  }
+
+  const slots: Array<import("../scheduling/slots").FreeSlot> = [];
+  for (const target of targets) {
+    const found = await getFreeSlots({
+      providerId: target.providerId || undefined,
+      serviceId: target.serviceId,
+      fromISO: new Date(startMs).toISOString(),
+      toISO: new Date(startMs + durationMinutes * 60000).toISOString(),
+      durationMinutes,
+    });
+    slots.push(...found);
+  }
+  const candidates = slots.filter((slot) => Date.parse(slot.startISO) === startMs);
+  if (!candidates.length) {
+    throw new BookingError("No provider is free at that time. Pick another slot.", 409);
+  }
+
+  const day = nyDayOf(startMs);
+  const applications = await listApplications({status: "approved"}).catch(() => []);
+  const createdAtByAccount = new Map(
+    applications.map((application) => [`prov_app_${application.id}`, application.createdAt ?? ""]),
+  );
+  const ranked = await Promise.all(
+    candidates.map(async (slot) => {
+      const dayBookings = (await listScheduledBookingsForProvider(slot.providerId)).filter(
+        (booking) => booking.startsAt && nyDayOf(Date.parse(booking.startsAt)) === day,
+      );
+      return {
+        slot,
+        dayCount: dayBookings.length,
+        createdAt: createdAtByAccount.get(slot.providerId) ?? "",
+      };
+    }),
+  );
+  ranked.sort(
+    (a, b) => a.dayCount - b.dayCount || a.createdAt.localeCompare(b.createdAt) || a.slot.providerId.localeCompare(b.slot.providerId),
+  );
+  const winner = ranked[0]!.slot;
+
+  const result = await createScheduledMemberBooking({
+    member: input.member,
+    serviceId: winner.serviceId,
+    mode: input.mode,
+    providerId: winner.providerId,
+    slotStart: winner.startISO,
+    enforceCredits: input.enforceCredits,
+  });
+  return {booking: result.booking, provider: result.provider};
+}

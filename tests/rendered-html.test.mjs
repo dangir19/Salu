@@ -40,7 +40,7 @@ test("keeps Atlas primary while preserving marketplace discovery",()=>{
  assert.doesNotMatch(app,/Choose your in-home wellness today/);
 });
 test("supports booking, credits, packages and local demo persistence",()=>{
- for(const term of ["confirmBooking","setCredits","setBookings","purchasePackage","localStorage","PackageProduct"]){assert.match(app,new RegExp(term))}
+ for(const term of ["handleSlotBooked","setCredits","setBookings","purchasePackage","localStorage","PackageProduct"]){assert.match(app,new RegExp(term))}
 });
 test("covers required services and safety boundaries",()=>{
  for(const term of ["sports massage","Blood tests","IV drip","NAD\\+ drip","Acupuncture","Lymphatic drainage massage","Facial workout massage","Dermatology consultation","sleep-test","does not process insurance","call 911"]){assert.match(app+data,new RegExp(term,"i"))}
@@ -199,7 +199,7 @@ test("exposes shareable member routes and a branded unknown-page state",()=>{
  assert.match(notFound,/from "next\/link"/);
 });
 test("uses package sessions before charging Credits and labels demo billing",()=>{
- assert.match(app,/confirmed using a \$\{pack\.name\} session/);
+ assert.match(app,/using a \$\{b\.packageName\} session/);
  assert.match(app,/packageName&&booking\.packageItem/);
  assert.match(app,/setCredits\(v=>v\+booking\.credits\)/);
  assert.match(app,/Stripe Billing is not connected yet/);
@@ -227,7 +227,7 @@ test("guides the booking flow with steps and what-happens-next",()=>{
  assert.match(app,/2 · Time &amp; confirm/);
  assert.match(app,/className="next-steps"/);
  assert.match(app,/WHAT HAPPENS NEXT/);
- assert.match(app,/Your request goes to/);
+ assert.match(app,/Pick any free time on a live provider calendar/);
  assert.match(css,/\.modal-steps span\.active\{[^}]*background:var\(--forest\)/);
  assert.match(css,/\.next-steps li::before/);
 });

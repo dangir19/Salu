@@ -169,14 +169,38 @@ export const bookings = sqliteTable("bookings", {
   serviceId: text("service_id").notNull(),
   serviceName: text("service_name").notNull(),
   provider: text("provider").notNull(),
+  providerId: text("provider_id"),
   availabilityId: text("availability_id"),
   date: text("date").notNull(),
   startsAt: text("starts_at"),
+  slotEnd: text("slot_end"),
   mode: text("mode").notNull(),
   status: text("status").notNull(),
   creditsCharged: integer("credits_charged").notNull().default(0),
   packageName: text("package_name"),
   packageItem: text("package_item"),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const providerAvailability = sqliteTable("provider_availability", {
+  id: text("id").primaryKey(),
+  providerId: text("provider_id").notNull(),
+  dayOfWeek: integer("day_of_week").notNull(),
+  startMinutes: integer("start_minutes").notNull(),
+  endMinutes: integer("end_minutes").notNull(),
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
+export const providerDateOverrides = sqliteTable("provider_date_overrides", {
+  id: text("id").primaryKey(),
+  providerId: text("provider_id").notNull(),
+  date: text("date").notNull(),
+  startMinutes: integer("start_minutes"),
+  endMinutes: integer("end_minutes"),
+  isClosed: integer("is_closed").notNull().default(0),
+  note: text("note"),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });

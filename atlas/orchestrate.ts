@@ -1,6 +1,6 @@
 import type {Member} from "../domain/types";
 import {isPlanId} from "../payments/catalog";
-import {pickWindow, windowsForService} from "./availability";
+import {pickWindow, realWindowsForService} from "./availability";
 import {isOpenAIReady, readAtlasEnv, type AtlasEnv} from "./env";
 import {planWithOpenAI} from "./openai";
 import {composeAtlasText, planAtlasTurn} from "./planner";
@@ -116,11 +116,13 @@ export async function runAtlasTurn(input: RunAtlasTurnInput): Promise<AtlasTurn>
     }
   }
 
-  const plan = planAtlasTurn({message, history: input.history, pending: input.pending});
+  const plan = await planAtlasTurn({message, history: input.history, pending: input.pending});
   const traces: AtlasToolTrace[] = [];
   const matches: AtlasServiceMatch[] = [];
   const windows: AtlasWindow[] = [];
   let bookingResult: CreateBookingResult | null = null;
+  let toolError: string | null = null;
+  let availabilityNote: string | null = null;
 
   for (const tool of plan.tools) {
     try {
@@ -131,24 +133,35 @@ export async function runAtlasTurn(input: RunAtlasTurnInput): Promise<AtlasTurn>
         matches.push(...found.matches);
       }
       if (tool.name === "check_availability") {
-        const availability = result as {windows: AtlasWindow[]; service: AtlasServiceMatch | null};
+        const availability = result as {windows: AtlasWindow[]; service: AtlasServiceMatch | null; note?: string};
         windows.push(...availability.windows);
         if (availability.service) matches.push(availability.service);
+        if (availability.note) availabilityNote = availability.note;
       }
       if (tool.name === "create_booking") {
         bookingResult = result as CreateBookingResult;
       }
-    } catch {
+    } catch (error) {
       traces.push({name: tool.name, args: tool.args, ok: false});
+      if (!toolError) toolError = error instanceof Error ? error.message : "That step failed.";
     }
   }
 
   const uniqueMatches = matches.filter((match, index) => matches.findIndex((item) => item.id === match.id) === index);
   const uniqueWindows = windows.filter((window, index) => windows.findIndex((item) => item.id === window.id) === index);
   const pending = bookingResult
-    ? {serviceId: bookingResult.booking.serviceId, date: bookingResult.booking.date, mode: bookingResult.booking.mode}
+    ? {
+      serviceId: bookingResult.booking.serviceId,
+      date: bookingResult.booking.date,
+      mode: bookingResult.booking.mode,
+      packageName: bookingResult.booking.packageName,
+      packageItem: bookingResult.booking.packageItem,
+    }
     : plan.pending;
-  const chosen = pending ? pickWindow(uniqueWindows.length ? uniqueWindows : windowsForService(pending.serviceId), message, {pendingDate: pending.date}) : null;
+  const fallbackWindows = pending && !uniqueWindows.length ? await realWindowsForService(pending.serviceId) : [];
+  const chosen = pending
+    ? pickWindow(uniqueWindows.length ? uniqueWindows : fallbackWindows, message, {pendingDate: pending.date})
+    : null;
 
   return {
     planner: "deterministic",
@@ -159,6 +172,8 @@ export async function runAtlasTurn(input: RunAtlasTurnInput): Promise<AtlasTurn>
       booked: bookingResult?.booking ?? null,
       matches: uniqueMatches,
       windows: uniqueWindows,
+      toolError,
+      note: availabilityNote,
     }),
     safety: {kind: plan.safety},
     tools: traces,

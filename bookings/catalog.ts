@@ -22,3 +22,11 @@ export function creditsForService(serviceId: string, planId: string): number | n
   if (!service) return null;
   return Math.round(service.standardPrice * (1 - planDiscount(planId)));
 }
+
+/** Parse catalog durations like "60 min" into minutes; falls back to 60. */
+export function durationMinutesForService(serviceId: string): number {
+  const service = findCatalogService(serviceId);
+  const match = service?.duration?.match(/(\d+)/);
+  const minutes = match ? Number(match[1]) : NaN;
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : 60;
+}

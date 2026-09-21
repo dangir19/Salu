@@ -125,7 +125,7 @@ async function handleStatus(request: Request, runtimeEnv: RuntimeEnv): Promise<R
   if (!auth.ok) {
     return json({source: "server", error: auth.error, opsOpen: false}, auth.status);
   }
-  let body: {id?: string; status?: string; reviewNote?: string; docsLicenseProof?: string; docsInsurance?: string};
+  let body: {id?: string; status?: string; action?: string; reviewNote?: string; docsLicenseProof?: string; docsInsurance?: string};
   try {
     body = (await request.json()) as typeof body;
   } catch {

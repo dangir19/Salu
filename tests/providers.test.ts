@@ -18,6 +18,7 @@ import {
   submitApplication,
   updateApplicationStatus,
 } from "../providers/service.ts";
+import {resetProviderWorkspaceMemory, resolveProviderAccount} from "../provider/service.ts";
 import {findCatalogService} from "../bookings/catalog.ts";
 import {createMemberBooking, resetBookingMemory} from "../bookings/service.ts";
 import {rememberMember, resetPaymentMemory} from "../payments/ledger.ts";
@@ -310,4 +311,70 @@ test("ops secret is an extra lock after the admin session, not a public bypass",
   const approvedBody = await approved.json() as {application: {status: string; docsLicenseProof: string}};
   assert.equal(approvedBody.application.status, "approved");
   assert.equal(approvedBody.application.docsLicenseProof, "received");
+});
+
+test("approving an application provisions a provider account matched by email on sign-in", async () => {
+  resetProviderMemory();
+  resetProviderWorkspaceMemory();
+  const application = await submitApplication(validPayload({email: "workspace@joinsalu.com"}));
+  assert.equal(await resolveProviderAccount({email: "workspace@joinsalu.com"}), null);
+
+  const approved = await updateApplicationStatus({id: application.id, status: "approved"});
+  const account = await resolveProviderAccount({email: "WORKSPACE@joinsalu.com"});
+  assert.ok(account);
+  assert.equal(account.email, "workspace@joinsalu.com");
+  assert.equal(account.id, `prov_app_${approved.id}`);
+  assert.equal(account.status, "approved");
+  assert.equal(account.practiceId, approved.id);
+  assert.equal(account.practiceName, "Elena Díaz");
+  assert.deepEqual(
+    account.serviceIds,
+    ["deep-tissue", "sports-massage", "lymphatic-massage"].map((key) =>
+      liveServiceId(approved.id, key),
+    ),
+  );
+});
+
+test("request-info moves an application to under review with a required note", async () => {
+  resetProviderMemory();
+  const application = await submitApplication(validPayload({email: "info@joinsalu.com"}));
+
+  await assert.rejects(
+    () => updateApplicationStatus({id: application.id, action: "request-info"}),
+    (error: unknown) => error instanceof ProviderError,
+  );
+  await assert.rejects(
+    () => updateApplicationStatus({id: application.id, action: "request-info", reviewNote: "   "}),
+    (error: unknown) => error instanceof ProviderError,
+  );
+  await assert.rejects(
+    () => updateApplicationStatus({id: application.id, action: "bogus"}),
+    (error: unknown) => error instanceof ProviderError,
+  );
+
+  const moved = await updateApplicationStatus({
+    id: application.id,
+    action: "request-info",
+    reviewNote: "Send your Florida license proof.",
+  });
+  assert.equal(moved.status, "under_review");
+  assert.equal(moved.reviewNote, "Send your Florida license proof.");
+  const catalog = await listApprovedCatalog();
+  assert.equal(catalog.providers.length, 0);
+});
+
+test("request-info works through the admin status endpoint", async () => {
+  resetProviderMemory();
+  resetMemberMemory();
+  const env = {SALU_ADMIN_EMAILS: "bd@joinsalu.com"};
+  const created = await submitApplication(validPayload({email: "queue-info@joinsalu.com"}));
+  const res = await handleProvidersFetch(new Request("http://localhost/api/providers/applications/status", {
+    method: "POST",
+    headers: {...sessionHeaders("bd@joinsalu.com"), "Content-Type": "application/json"},
+    body: JSON.stringify({id: created.id, action: "request-info", reviewNote: "Insurance docs, please."}),
+  }), env);
+  assert.equal(res.status, 200);
+  const body = await res.json() as {application: {status: string; reviewNote: string}};
+  assert.equal(body.application.status, "under_review");
+  assert.equal(body.application.reviewNote, "Insurance docs, please.");
 });

@@ -397,8 +397,57 @@ export async function listInboxForProvider(provider: ProviderAccount): Promise<A
 export async function listJobsForProvider(provider: ProviderAccount): Promise<AppointmentRequest[]> {
   const rows = await allRequests();
   return rows.filter((row) =>
-    row.assignedProviderId === provider.id && (row.status === "accepted" || row.status === "proposed")
+    row.assignedProviderId === provider.id &&
+    (row.status === "accepted" || row.status === "proposed" || row.status === "assigned")
   );
+}
+
+/**
+ * Link a member booking that was made through the real scheduling engine
+ * (a concrete provider + time slot) to an appointment request for that
+ * provider's queue. Booking "confirmed" <-> request "assigned": the provider
+ * has been picked by the engine but has not accepted yet.
+ */
+export async function createAssignedRequestFromBooking(input: {
+  booking: Booking;
+  member: Member;
+  providerId: string;
+}): Promise<AppointmentRequest | null> {
+  const existing = await storedRequestByBooking(input.booking.id);
+  const now = new Date().toISOString();
+  const practice = practiceForService(input.booking.serviceId);
+  if (existing) {
+    const next: AppointmentRequest = {
+      ...existing,
+      date: input.booking.date,
+      mode: input.booking.mode,
+      status: input.booking.status === "cancelled" ? "cancelled" : "assigned",
+      assignedProviderId: input.providerId,
+      updatedAt: now,
+    };
+    await persistRequest(next);
+    return next;
+  }
+  if (!practice) return null;
+  const request: AppointmentRequest = {
+    id: `req_${crypto.randomUUID()}`,
+    bookingId: input.booking.id,
+    memberId: input.member.id,
+    memberDisplayName: input.member.displayName,
+    serviceId: input.booking.serviceId,
+    serviceName: input.booking.serviceName,
+    practiceId: practice.id,
+    practiceName: practice.name,
+    date: input.booking.date,
+    mode: input.booking.mode,
+    creditsCharged: input.booking.creditsCharged,
+    status: input.booking.status === "cancelled" ? "cancelled" : "assigned",
+    assignedProviderId: input.providerId,
+    createdAt: now,
+    updatedAt: now,
+  };
+  await persistRequest(request);
+  return request;
 }
 
 export async function acceptRequest(input: {
