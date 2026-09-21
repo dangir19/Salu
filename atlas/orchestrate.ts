@@ -50,16 +50,83 @@ function emptyTurn(planner: AtlasPlanner, source: "demo" | "server"): AtlasTurn 
   };
 }
 
+type MemberOrgSummary = {id: string; name: string; role: "admin" | "staff"};
+
+async function loadHealthSummary(
+  member: Member | null | undefined,
+): Promise<import("../health/service").WeeklyHealthSummary | null> {
+  if (!member) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore: health/service is optional at build time; resolves when present.
+    const mod = await import("../health/service");
+    const summary = await (
+      mod as unknown as {getWeeklySummary(memberId: string): Promise<import("../health/service").WeeklyHealthSummary>}
+    ).getWeeklySummary(member.id);
+    return summary.hasData ? summary : null;
+  } catch {
+    return null;
+  }
+}
+
+async function loadMemberOrgs(member: Member | null | undefined): Promise<MemberOrgSummary[]> {
+  if (!member) return [];
+  try {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore: ../business/service is being built in parallel; this resolves once it lands.
+    const mod = await import("../business/service");
+    const rows = await (
+      mod as unknown as {
+        getMemberOrgs(memberId: string): Promise<
+          Array<{org: {id: string; name: string; status: string}; role: "admin" | "staff"}>
+        >;
+      }
+    ).getMemberOrgs(member.id);
+    return rows
+      .filter((row) => row.org.status === "active")
+      .map((row) => ({id: row.org.id, name: row.org.name, role: row.role}));
+  } catch {
+    return [];
+  }
+}
+
+async function recoveryNoteForTurn(
+  message: string,
+  matches: {name: string}[],
+  summary: import("../health/service").WeeklyHealthSummary | null,
+): Promise<string | null> {
+  if (!summary) return null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore: health/service is optional at build time; resolves when present.
+    const mod = await import("../health/service");
+    const recommendation = (
+      mod as unknown as {
+        recommendRecovery(s: import("../health/service").WeeklyHealthSummary): import("../health/service").RecoveryRecommendation | null;
+      }
+    ).recommendRecovery(summary);
+    if (!recommendation) return null;
+    const trainingIntent = /recover|sore|tired|train|running|\brun\b|marathon|workout|legs|rest day/i.test(message);
+    if (!trainingIntent && matches.length === 0) return null;
+    return `From your training this week: ${recommendation.note} I can book ${recommendation.services.join(" or ")} whenever you're ready \u2014 this is general wellness coordination, not medical advice.`;
+  } catch {
+    return null;
+  }
+}
+
 export async function runAtlasTurn(input: RunAtlasTurnInput): Promise<AtlasTurn> {
   const message = input.message.trim();
   const env = input.env ?? readAtlasEnv();
   const planner: AtlasPlanner = input.preferOpenAI !== false && isOpenAIReady(env) ? "openai" : "deterministic";
   const source = input.member ? "server" : "demo";
+  const healthSummary = await loadHealthSummary(input.member);
   const context: ToolContext = {
     member: input.member,
     entitlements: input.entitlements,
     planId: isPlanId(input.planId) ? input.planId : input.member?.planId ?? "member",
     enforceCredits: Boolean(input.enforceCredits && input.member),
+    orgs: await loadMemberOrgs(input.member),
+    healthSummary,
   };
 
   if (!message) {
@@ -174,6 +241,7 @@ export async function runAtlasTurn(input: RunAtlasTurnInput): Promise<AtlasTurn>
       windows: uniqueWindows,
       toolError,
       note: availabilityNote,
+      recoveryNote: await recoveryNoteForTurn(message, uniqueMatches, healthSummary),
     }),
     safety: {kind: plan.safety},
     tools: traces,

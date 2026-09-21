@@ -8,6 +8,7 @@ import {
   resolveMember,
   setMemberMembership,
 } from "./ledger";
+import {applyOrgCreditEntry} from "./org-ledger";
 import {
   idFromExpandable,
   invoiceSubscriptionId,
@@ -115,6 +116,26 @@ async function handleCheckoutCompleted(
   event: StripeEvent,
   session: StripeCheckoutSession,
 ): Promise<WebhookResult> {
+  if (session.metadata?.kind === "org_credits") {
+    const orgId = session.metadata?.orgId;
+    if (!orgId) {
+      return {eventId: event.id, type: event.type, applied: false, detail: "org not found"};
+    }
+    const credits = creditsFromUsdCents(session.amount_total ?? 0);
+    if (!credits) {
+      return {eventId: event.id, type: event.type, applied: false, detail: "no credits"};
+    }
+    await applyOrgCreditEntry({
+      orgId,
+      credits,
+      kind: "topup",
+      label: "Business credit top-up",
+      stripeEventId: event.id,
+      stripeObjectId: session.id,
+    });
+    return {eventId: event.id, type: event.type, applied: true, detail: `org topup ${credits}`};
+  }
+
   const customerId = idFromExpandable(session.customer);
   const member = await memberFromCustomer(env, customerId, {
     memberId: session.metadata?.memberId ?? session.client_reference_id,

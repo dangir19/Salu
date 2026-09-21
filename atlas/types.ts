@@ -22,6 +22,10 @@ export type AtlasPending = {
   providerId?: string;
   startISO?: string;
   endISO?: string;
+  /** Business ordering passthrough: org being billed plus who the service is for. */
+  orgId?: string;
+  recipientName?: string;
+  recipientRoom?: string;
 };
 
 export type AtlasEntitlement = {

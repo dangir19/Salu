@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {handleAdminFetch, type AdminBookingRow, type AdminMemberRow, type AdminStore} from "../admin/handlers.ts";
+import {handleAdminFetch, type AdminBookingRow, type AdminMemberRow, type AdminOrgRow, type AdminStore} from "../admin/handlers.ts";
 import {memoryUpsertMember, resetMemberMemory} from "../auth/members.ts";
 import {cancelMemberBooking, createMemberBooking, resetBookingMemory} from "../bookings/service.ts";
 import {applyCreditEntry, getMemberBilling, resetPaymentMemory} from "../payments/ledger.ts";
@@ -56,6 +56,20 @@ function makeStore(overrides: Partial<AdminStore> = {}): AdminStore {
     },
   ];
   const calls: Array<{method: string; args: unknown[]}> = [];
+  const orgs: AdminOrgRow[] = [
+    {
+      id: "org_1",
+      name: "Sunset Senior Living",
+      orgType: "senior_facility",
+      contactName: "Rita",
+      contactEmail: "rita@sunset.example",
+      status: "pending",
+      memberCount: 3,
+      orderCount: 5,
+      creditsSpent: 400,
+      createdAt: "2026-09-01T00:00:00.000Z",
+    },
+  ];
   const store: AdminStore = {
     async listMembers() {
       return members;
@@ -69,6 +83,7 @@ function makeStore(overrides: Partial<AdminStore> = {}): AdminStore {
         applications: {submitted: 2, approved: 1},
         bookings: {confirmed: 1},
         creditsOutstanding: 150,
+        organizations: {total: 1, pending: 1, active: 0},
       };
     },
     async cancelBooking(id) {
@@ -89,6 +104,23 @@ function makeStore(overrides: Partial<AdminStore> = {}): AdminStore {
       if (!member) return null;
       member.availableCredits += credits;
       return {memberId, availableCredits: member.availableCredits, transactionId: "tx_test"};
+    },
+    async listOrgs() {
+      return orgs;
+    },
+    async approveOrg(id) {
+      calls.push({method: "approveOrg", args: [id]});
+      const org = orgs.find((row) => row.id === id) ?? null;
+      if (!org) return null;
+      org.status = "active";
+      return org;
+    },
+    async setOrgStatus(id, status) {
+      calls.push({method: "setOrgStatus", args: [id, status]});
+      const org = orgs.find((row) => row.id === id) ?? null;
+      if (!org) return null;
+      org.status = status;
+      return org;
     },
     ...overrides,
   };
@@ -143,6 +175,47 @@ test("lists members and bookings for an admin", async () => {
   const bookingsBody = (await bookingsRes.json()) as {bookings: AdminBookingRow[]};
   assert.equal(bookingsBody.bookings.length, 1);
   assert.equal(bookingsBody.bookings[0]?.creditsCharged, 135);
+});
+
+test("lists organizations and approves/updates them through the admin endpoints", async () => {
+  const store = makeStore();
+  const listRes = await handleAdminFetch(adminRequest("/api/admin/orgs"), adminEnv, store);
+  assert.equal(listRes.status, 200);
+  const listBody = (await listRes.json()) as {orgs: AdminOrgRow[]};
+  assert.equal(listBody.orgs.length, 1);
+  assert.equal(listBody.orgs[0]?.status, "pending");
+
+  const approveRes = await handleAdminFetch(
+    adminRequest("/api/admin/orgs/approve", {method: "POST", body: JSON.stringify({orgId: "org_1"})}),
+    adminEnv,
+    store,
+  );
+  assert.equal(approveRes.status, 200);
+  const approveBody = (await approveRes.json()) as {org: AdminOrgRow};
+  assert.equal(approveBody.org.status, "active");
+
+  const statusRes = await handleAdminFetch(
+    adminRequest("/api/admin/orgs/status", {method: "POST", body: JSON.stringify({orgId: "org_1", status: "suspended"})}),
+    adminEnv,
+    store,
+  );
+  assert.equal(statusRes.status, 200);
+  const statusBody = (await statusRes.json()) as {org: AdminOrgRow};
+  assert.equal(statusBody.org.status, "suspended");
+
+  const badStatus = await handleAdminFetch(
+    adminRequest("/api/admin/orgs/status", {method: "POST", body: JSON.stringify({orgId: "org_1", status: "bogus"})}),
+    adminEnv,
+    store,
+  );
+  assert.equal(badStatus.status, 400);
+
+  const missing = await handleAdminFetch(
+    adminRequest("/api/admin/orgs/approve", {method: "POST", body: JSON.stringify({orgId: "org_missing"})}),
+    adminEnv,
+    store,
+  );
+  assert.equal(missing.status, 503);
 });
 
 test("validates the credit adjustment endpoint", async () => {

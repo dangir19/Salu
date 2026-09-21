@@ -1,0 +1,10 @@
+CREATE TABLE `organizations` (`id` text PRIMARY KEY NOT NULL, `name` text NOT NULL, `org_type` text DEFAULT 'other' NOT NULL, `contact_name` text NOT NULL, `contact_email` text NOT NULL, `contact_phone` text, `address` text, `billing_email` text, `status` text DEFAULT 'pending' NOT NULL, `stripe_customer_id` text, `created_at` text NOT NULL, `updated_at` text NOT NULL);
+CREATE TABLE `org_members` (`id` text PRIMARY KEY NOT NULL, `org_id` text NOT NULL, `member_id` text NOT NULL, `role` text DEFAULT 'staff' NOT NULL, `created_at` text NOT NULL);
+CREATE UNIQUE INDEX `org_members_org_member_idx` ON `org_members` (`org_id`, `member_id`);
+CREATE TABLE `org_wallets` (`id` text PRIMARY KEY NOT NULL, `org_id` text NOT NULL UNIQUE, `available_credits` integer DEFAULT 0 NOT NULL, `updated_at` text NOT NULL);
+CREATE TABLE `org_credit_transactions` (`id` text PRIMARY KEY NOT NULL, `wallet_id` text NOT NULL, `kind` text NOT NULL, `credits` integer NOT NULL, `label` text NOT NULL, `created_at` text NOT NULL, `booking_id` text, `stripe_event_id` text, `stripe_object_id` text);
+CREATE TABLE `booking_line_items` (`id` text PRIMARY KEY NOT NULL, `booking_id` text NOT NULL, `label` text NOT NULL, `quantity` integer DEFAULT 1 NOT NULL, `unit_credits` integer NOT NULL, `total_credits` integer NOT NULL, `created_at` text NOT NULL);
+CREATE TABLE `org_recurring_orders` (`id` text PRIMARY KEY NOT NULL, `org_id` text NOT NULL, `service_id` text NOT NULL, `provider_id` text, `recipient_name` text, `recipient_room` text, `weekday` integer NOT NULL, `time_local` text NOT NULL, `start_date` text NOT NULL, `end_date` text NOT NULL, `status` text DEFAULT 'active' NOT NULL, `created_by` text NOT NULL, `created_at` text NOT NULL);
+ALTER TABLE `bookings` ADD COLUMN `org_id` text;
+ALTER TABLE `bookings` ADD COLUMN `recipient_name` text;
+ALTER TABLE `bookings` ADD COLUMN `recipient_room` text;

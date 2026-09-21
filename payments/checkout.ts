@@ -26,6 +26,7 @@ export type CheckoutRequest = {
   kind: "membership" | "credits";
   planId?: string;
   credits?: number;
+  orgId?: string;
 };
 
 export type CheckoutResponse = {
@@ -62,10 +63,51 @@ export async function startCheckout(
   request: CheckoutRequest,
   origin: string,
 ): Promise<CheckoutResponse> {
+  if (request.kind === "credits" && request.orgId) {
+    return startOrgCreditCheckout(env, member, request.credits ?? 100, request.orgId, origin);
+  }
   if (request.kind === "credits") {
     return startCreditCheckout(env, member, request.credits ?? 100, origin);
   }
   return startMembershipCheckout(env, member, request.planId ?? "member", origin);
+}
+
+async function startOrgCreditCheckout(
+  env: StripeEnv,
+  member: Member,
+  credits: number,
+  orgId: string,
+  origin: string,
+): Promise<CheckoutResponse> {
+  if (!Number.isInteger(credits) || credits <= 0) {
+    throw new Error("Choose how many Credits to add.");
+  }
+  const customer = await ensureCustomer(env, member);
+  const session = await createCheckoutSession(env.STRIPE_SECRET_KEY, {
+    mode: "payment",
+    customer: customer.id,
+    client_reference_id: member.id,
+    success_url: `${origin}/business?checkout=success`,
+    cancel_url: `${origin}/business?checkout=cancel`,
+    metadata: {kind: "org_credits", memberId: member.id, orgId, credits: String(credits)},
+    line_items: [
+      {
+        quantity: 1,
+        price_data: {
+          currency: "usd",
+          unit_amount: credits * 100,
+          product_data: {
+            name: `Salu Business Credits · ${credits}`,
+            description: "Business wallet funds for the Salu marketplace. 1 Credit = $1. Not Salu revenue.",
+          },
+        },
+      },
+    ],
+  });
+  return {
+    url: session.url,
+    message: `Continue to Stripe to add ${credits} Credits to the business wallet.`,
+  };
 }
 
 async function startCreditCheckout(

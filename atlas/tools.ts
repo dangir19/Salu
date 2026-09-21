@@ -27,6 +27,14 @@ export type CreateBookingArgs = {
   providerId?: string;
   /** Exact slot start (ISO 8601) from a check_availability window. Without providerId, Atlas auto-assigns a free provider. */
   startISO?: string;
+  /** Business organization id from context.orgs. Charges the org's credit wallet instead of the member's. */
+  orgId?: string;
+  /** Name of the person receiving the service (resident, guest, employee). */
+  recipientName?: string;
+  /** Room or suite for the recipient, e.g. "Room 214". */
+  recipientRoom?: string;
+  /** Group order size: books the slot quantity times (integer 1–10, default 1). */
+  quantity?: number;
 };
 
 export type ToolContext = {
@@ -34,6 +42,10 @@ export type ToolContext = {
   entitlements?: AtlasEntitlement[];
   planId?: string;
   enforceCredits: boolean;
+  /** Active business organizations the member can order for, from getMemberOrgs. */
+  orgs?: Array<{id: string; name: string; role: "admin" | "staff"}>;
+  /** Weekly training summary from connected health apps, when the member linked one. */
+  healthSummary?: import("../health/service").WeeklyHealthSummary | null;
 };
 
 export type DiscoverResult = {matches: AtlasServiceMatch[]};
@@ -44,6 +56,8 @@ export type CreateBookingResult = {
   creditsApplied: boolean;
   availableCredits?: number;
   bookings?: UiBooking[];
+  /** Present for business group orders: how many bookings were placed. */
+  groupOrder?: {count: number};
 };
 
 export const ATLAS_TOOL_SCHEMAS = [
@@ -80,7 +94,7 @@ export const ATLAS_TOOL_SCHEMAS = [
     type: "function" as const,
     function: {
       name: "create_booking",
-      description: "Create a member reservation through the booking service. Pass providerId + startISO from a check_availability window to lock that exact slot (409 if it was just taken). Pass startISO without providerId and Atlas auto-assigns a free provider. Without startISO it books by display date (legacy/demo path).",
+      description: "Create a member reservation through the booking service. Pass providerId + startISO from a check_availability window to lock that exact slot (409 if it was just taken). Pass startISO without providerId and Atlas auto-assigns a free provider. Without startISO it books by display date (legacy/demo path). For business accounts: pass orgId (from context) plus recipientName/recipientRoom, and quantity for group orders like '4 massages for our residents'.",
       parameters: {
         type: "object",
         properties: {
@@ -91,6 +105,10 @@ export const ATLAS_TOOL_SCHEMAS = [
           packageItem: {type: "string"},
           providerId: {type: "string", description: "Provider account id from a check_availability window."},
           startISO: {type: "string", description: "Exact slot start (ISO 8601) from a check_availability window."},
+          orgId: {type: "string", description: "Business organization id from the member's context. Charges the organization's credit wallet."},
+          recipientName: {type: "string", description: "Name of the person receiving the service (resident, guest, employee)."},
+          recipientRoom: {type: "string", description: "Room or suite for the recipient, e.g. 'Room 214'."},
+          quantity: {type: "integer", description: "Group order size: books the slot this many times (1-10, default 1)."},
         },
         required: ["serviceId", "date"],
       },
@@ -225,9 +243,137 @@ function sameServiceKey(a: string, b: string): boolean {
   return keyA === keyB;
 }
 
+type BusinessServiceLike = {
+  requireOrgRole(memberId: string, orgId: string, roles?: Array<"admin" | "staff">): Promise<unknown>;
+};
+
+async function loadBusinessService(): Promise<BusinessServiceLike> {
+  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+  // @ts-ignore: ../business/service is being built in parallel; this resolves once it lands.
+  const mod = await import("../business/service");
+  return mod as unknown as BusinessServiceLike;
+}
+
+type OrgBookingFields = {
+  orgId: string;
+  recipientName?: string;
+  recipientRoom?: string;
+};
+
+type OrgPlacedBooking = {
+  booking: Booking;
+  provider: {id: string; name: string};
+  creditsApplied: boolean;
+  availableCredits: number;
+};
+
+async function createOrgBooking(
+  args: CreateBookingArgs,
+  context: ToolContext,
+  orgId: string,
+  quantity: number,
+): Promise<CreateBookingResult> {
+  const member = context.member;
+  if (!member) {
+    throw new Error("Sign in with your business account to order for your organization.");
+  }
+  let business: BusinessServiceLike;
+  try {
+    business = await loadBusinessService();
+  } catch {
+    throw new Error("Business ordering is unavailable right now. Try again in a bit.");
+  }
+  // BusinessError (404 no membership, 403 wrong role or inactive org) surfaces to the caller.
+  await business.requireOrgRole(member.id, orgId);
+
+  const startISO = args.startISO?.trim() || undefined;
+  const providerId = args.providerId?.trim() || undefined;
+  const mode = (args.mode ?? "").trim() || undefined;
+
+  const results: OrgPlacedBooking[] = [];
+  for (let i = 0; i < quantity; i += 1) {
+    const fields: OrgBookingFields = {
+      orgId,
+      recipientName: args.recipientName?.trim() || (quantity > 1 ? `Guest ${i + 1}` : undefined),
+      recipientRoom: args.recipientRoom?.trim() || undefined,
+    };
+    try {
+      if (providerId && startISO) {
+        const startMs = Date.parse(startISO);
+        if (!Number.isFinite(startMs)) throw new Error("Choose a time for this reservation.");
+        const targets = await expandServiceSlotTargets(args.serviceId);
+        const accountId = schedulingProviderId(providerId);
+        const target = targets.find((entry) => entry.providerId === accountId);
+        if (!target) {
+          throw new BookingError("That provider is not offering this service right now.", 404);
+        }
+        const scheduled = await createScheduledMemberBooking({
+          member,
+          serviceId: target.serviceId,
+          mode,
+          providerId: accountId,
+          slotStart: startISO,
+          enforceCredits: context.enforceCredits,
+          ...fields,
+        } as Parameters<typeof createScheduledMemberBooking>[0] & OrgBookingFields);
+        results.push(scheduled);
+      } else {
+        if (!startISO) throw new Error("Choose a time for this reservation.");
+        const live = parseLiveServiceId(args.serviceId);
+        const targets = await expandServiceSlotTargets(args.serviceId);
+        const engineServiceId = live ? args.serviceId : targets[0]?.serviceId;
+        if (!engineServiceId) {
+          throw new BookingError("No provider is free at that time. Pick another slot.", 409);
+        }
+        const assigned = await assignMemberBooking({
+          member,
+          serviceId: engineServiceId,
+          startISO,
+          mode,
+          enforceCredits: context.enforceCredits,
+          ...fields,
+        } as Parameters<typeof assignMemberBooking>[0] & OrgBookingFields);
+        const billing = await import("../payments/ledger").then((mod) => mod.getMemberBilling(member));
+        results.push({
+          booking: assigned.booking,
+          provider: assigned.provider,
+          creditsApplied: false,
+          availableCredits: billing.wallet.availableCredits,
+        });
+      }
+    } catch (error) {
+      const done = results.length;
+      throw new Error(
+        `Booked ${done} of ${quantity} for your organization before hitting an issue: ${
+          error instanceof Error ? error.message : "That step failed."
+        }`,
+      );
+    }
+  }
+
+  const bookings = results.map((result) => ({...toUiBooking(result.booking), provider: result.provider.name}));
+  const last = results[results.length - 1];
+  return {
+    booking: bookings[0]!,
+    source: "server",
+    creditsApplied: last?.creditsApplied ?? false,
+    availableCredits: last?.availableCredits,
+    bookings,
+    groupOrder: quantity > 1 ? {count: quantity} : undefined,
+  };
+}
+
 export async function createBooking(args: CreateBookingArgs, context: ToolContext): Promise<CreateBookingResult> {
   const service = findCatalogService(args.serviceId);
   if (!service) throw new Error("That service is not on the Salu menu.");
+  const orgId = args.orgId?.trim() || undefined;
+  const quantity = args.quantity ?? 1;
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) {
+    throw new Error("Quantity must be a whole number between 1 and 10.");
+  }
+  if (orgId) {
+    return createOrgBooking(args, context, orgId, quantity);
+  }
   const pack = args.packageName
     ? {packageName: args.packageName, packageItem: args.packageItem ?? service.name}
     : packageForService(service.name, context.entitlements);
@@ -388,6 +534,10 @@ export async function executeTool(
       packageItem: typeof args.packageItem === "string" ? args.packageItem : undefined,
       providerId: typeof args.providerId === "string" ? args.providerId : undefined,
       startISO: typeof args.startISO === "string" ? args.startISO : undefined,
+      orgId: typeof args.orgId === "string" ? args.orgId : undefined,
+      recipientName: typeof args.recipientName === "string" ? args.recipientName : undefined,
+      recipientRoom: typeof args.recipientRoom === "string" ? args.recipientRoom : undefined,
+      quantity: typeof args.quantity === "number" ? args.quantity : undefined,
     }, context);
   }
   throw new Error(`Unknown Atlas tool: ${name}`);

@@ -488,7 +488,7 @@ async function credentialsProviderReady() {
   }
 }
 
-async function postCredentials({
+export async function postCredentials({
   email,
   password,
   returnTo,

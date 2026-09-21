@@ -167,6 +167,7 @@ export function composeAtlasText(input: {
   windows: {date: string; mode: string}[];
   toolError?: string | null;
   note?: string | null;
+  recoveryNote?: string | null;
 }): string {
   if (input.safety === "emergency") {
     return educationalReply(input.message) ?? input.hint;
@@ -197,7 +198,9 @@ export function composeAtlasText(input: {
   if (education) return education;
   if (input.matches.length) {
     const names = input.matches.map((match) => match.name).join(", ");
-    return `I can help with that. From the Miami menu I would start with ${names}. Say the time you want and I will confirm the reservation.`;
+    const base = `I can help with that. From the Miami menu I would start with ${names}. Say the time you want and I will confirm the reservation.`;
+    return input.recoveryNote ? `${base} ${input.recoveryNote}` : base;
   }
-  return "I can help with that. I’ve considered your Miami location, timing and available Credits, and pulled together a few thoughtful options.";
+  const fallback = "I can help with that. I’ve considered your Miami location, timing and available Credits, and pulled together a few thoughtful options.";
+  return input.recoveryNote ? `${fallback} ${input.recoveryNote}` : fallback;
 }
