@@ -1,6 +1,6 @@
 import {Auth, isAuthAction} from "@auth/core";
 import {createAuthConfig} from "./config";
-import {registerNativeAccount} from "./credentials";
+import {registerNativeAccount, verifyNativeLogin} from "./credentials";
 import {applyAuthEnvToProcess, readAuthEnv} from "./env";
 import {getMePayload} from "./session";
 
@@ -20,6 +20,10 @@ export async function handleAuthFetch(request: Request, runtimeEnv: RuntimeEnv =
 
   if (url.pathname === "/api/auth/register") {
     return handleRegister(request);
+  }
+
+  if (url.pathname === "/api/auth/debug-login" && request.method === "POST") {
+    return handleDebugLogin(request);
   }
 
   const action = url.pathname.split("/api/auth/")[1]?.split("/")[0];
@@ -53,4 +57,22 @@ export async function handleRegister(request: Request): Promise<Response> {
   });
   if (!result.ok) return Response.json({error: result.error}, {status: result.status});
   return Response.json({ok: true});
+}
+
+// TEMPORARY diagnostic: reports which login step fails. Remove before calling auth done.
+async function handleDebugLogin(request: Request): Promise<Response> {
+  let body: {email?: string; password?: string} = {};
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return Response.json({error: "bad json"}, {status: 400});
+  }
+  const steps: Record<string, string> = {};
+  try {
+    const member = await verifyNativeLogin(body.email ?? "", body.password ?? "");
+    steps.verifyNativeLogin = member ? `member:${member.id}` : "null";
+  } catch (e) {
+    steps.verifyNativeLogin = `threw:${e instanceof Error ? e.message : String(e)}`;
+  }
+  return Response.json({steps});
 }
