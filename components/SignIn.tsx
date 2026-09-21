@@ -497,7 +497,7 @@ export async function postCredentials({
   password: string;
   returnTo: string;
 }) {
-  await postAuthForm("/api/auth/signin/credentials", {
+  await postAuthForm("/api/auth/callback/credentials", {
     email,
     password,
     callbackUrl: returnTo,
