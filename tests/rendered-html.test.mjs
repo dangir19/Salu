@@ -209,3 +209,33 @@ test("uses package sessions before charging Credits and labels demo billing",()=
  assert.match(app,/modal-dismiss/);
  assert.match(app,/Clear filters/);
 });
+test("shows pricing, how-it-works and trust signals on Home",()=>{
+ const home=app.slice(app.indexOf("function Home"),app.indexOf("function CompactService"));
+ for(const term of ["function HomePlans","function HowItWorks","function HomeTrust","className=\"home-plans\"","Simple pricing, honest value.","Compare plans","home-plan home-plan-${name.toLowerCase()}","className=\"how-it-works\"","Three steps to feeling better.","className=\"home-trust\"","TRUST & SAFETY","Real people, carefully welcomed.","self-attested; Salu collects proof"]){assert.match(home,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
+ for(const plan of ["Member","Gold","Platinum"]){assert.match(home,new RegExp(`\\["${plan}"`))}
+ assert.match(home,/<HomePlans go=\{go\}\/>/);
+ assert.match(home,/<HowItWorks\/>/);
+ assert.match(home,/<HomeTrust\/>/);
+ assert.match(css,/\.home-plans\{[^}]*background:var\(--forest\)/);
+ assert.match(css,/\.how-steps\{[^}]*grid-template-columns:repeat\(3/);
+ assert.match(css,/\.trust-grid\{[^}]*grid-template-columns:1fr 1fr/);
+});
+test("guides the booking flow with steps and what-happens-next",()=>{
+ assert.match(app,/className="modal-steps"/);
+ assert.match(app,/Booking progress/);
+ assert.match(app,/1 · Details/);
+ assert.match(app,/2 · Time &amp; confirm/);
+ assert.match(app,/className="next-steps"/);
+ assert.match(app,/WHAT HAPPENS NEXT/);
+ assert.match(app,/Your request goes to/);
+ assert.match(css,/\.modal-steps span\.active\{[^}]*background:var\(--forest\)/);
+ assert.match(css,/\.next-steps li::before/);
+});
+test("gives providers a value prop and a clear process on Apply",()=>{
+ const apply=app.slice(app.indexOf("function ProviderApplication"),app.indexOf("function ProviderPortal"));
+ assert.match(apply,/<ProviderValue\/>/);
+ assert.match(app,/function ProviderValue\(\)/);
+ for(const term of ["Keep 80% of every session","Direct deposit, handled","You, not a brand","Work where you already work","THE PROCESS","Apply as yourself","BD reviews","Get listed","Accept & get paid"]){assert.match(app,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
+ assert.match(css,/\.provider-value-grid\{[^}]*grid-template-columns:1fr 1fr/);
+ assert.match(css,/\.provider-process ol\{[^}]*grid-template-columns:repeat\(4/);
+});
