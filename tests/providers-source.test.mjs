@@ -20,13 +20,14 @@ test("wires Apply, catalog, and admin pipeline APIs with a labeled demo catalog"
     "/api/providers/apply",
     "/api/providers/catalog",
     "/api/providers/applications",
-    "INDEPENDENT PROVIDERS · FROM THE BD PIPELINE",
+    "INDEPENDENT PROVIDERS · PEOPLE WE KNOW",
     "AT-HOME SERVICES · DEMO CATALOG",
     "INDEPENDENT EXPERTS · FABRICATED DEMO",
     "Submit application",
     "Florida license number",
+    "Your resume or portfolio link",
+    "I consent to Salu running a background check",
     "Mobile / at-home",
-    "Miami pipeline",
     "home-apply",
     'go("provider-apply")',
     "If you already care for people here",
@@ -43,7 +44,7 @@ test("wires Apply, catalog, and admin pipeline APIs with a labeled demo catalog"
 test("gates /admin and application list/status behind an allowlisted session", () => {
   assert.match(app, /page==="admin"&&!admin/);
   assert.match(app, /<AdminForbidden go=\{go\} signOut=\{signOut\}\/>/);
-  assert.match(signIn, /Staff sign-in for the review queue/);
+  assert.match(signIn, /Staff sign-in\./);
   assert.match(signIn, /Continue as Salu admin/);
   assert.match(signIn, /Not authorized/);
   assert.match(config, /id: "admin-development"/);

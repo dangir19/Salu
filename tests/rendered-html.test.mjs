@@ -16,7 +16,7 @@ const catchAll=await readFile(new URL("../app/[[...slug]]/page.tsx",import.meta.
 
 test("keeps Atlas primary while preserving marketplace discovery",()=>{
  assert.match(app,/THE SALU NETWORK/);
- assert.match(app,/Premium, vetted in-home wellness brought to your door/);
+ assert.match(app,/Premium in-home wellness, from people we know and trust/);
  assert.doesNotMatch(app,/Service setting|Any setting/);
  assert.match(app,/rankedServiceIds\.map\(id=>services\.find\(s=>s\.id===id\)\)/);
  assert.match(app,/className="atlas-fab"/);
@@ -169,11 +169,11 @@ test("shows standard prices before plan discounts and charges discounted Credits
 test("keeps a single-member profile and adds About after plans",()=>{
  assert.ok(app.indexOf(">Appointments</button>")<app.indexOf(">Plans &amp; Packages</button>"));
  assert.ok(app.indexOf(">Plans &amp; Packages</button>")<app.indexOf(">About</button>"));
- for(const term of ["ABOUT SALU","Your health","concierge","WHY WE FOUNDED SALU","We founded Salu for health-conscious members","comfort of home","premium network of vetted, experienced talent","best care at home","on-demand, premium service","members&apos; time, comfort and care","Thoughtful in-home services, coordinated from one place","Community of experts vetted by Salu"]){assert.match(app,new RegExp(term))}
+ for(const term of ["ABOUT SALU","Your health","concierge","WHY WE FOUNDED SALU","We founded Salu for health-conscious members","comfort of home","We&apos;ve gathered people we know and trust","bring care home","on-demand, premium service","members&apos; time, comfort and care","Thoughtful in-home services, coordinated from one place","People we know by name, and trust in your home"]){assert.match(app,new RegExp(term))}
  assert.doesNotMatch(app,/coordinated from one calm place/);
  assert.doesNotMatch(app,/Independent experts presented clearly, without rankings or pressure/);
  assert.doesNotMatch(app,/About Us/);
- for(const term of ["principle-icon icon-person","principle-icon icon-breeze","principle-icon icon-community","Community of experts vetted by Salu"]){assert.match(app,new RegExp(term))}
+ for(const term of ["principle-icon icon-person","principle-icon icon-breeze","principle-icon icon-community","People we know by name, and trust in your home"]){assert.match(app,new RegExp(term))}
  assert.match(app,/packages built around your lifestyle - unlocking additional discounts/);
  assert.doesNotMatch(app,/health best friend|best friend\./i);
  assert.doesNotMatch(app,/getting back in a car after a massage/);
@@ -243,7 +243,7 @@ test("gives providers a value prop and a clear process on Apply",()=>{
  const apply=app.slice(app.indexOf("function ProviderApplication"),app.indexOf("function ProviderPortal"));
  assert.match(apply,/<ProviderValue\/>/);
  assert.match(app,/function ProviderValue\(\)/);
- for(const term of ["Keep 80% of every session","Direct deposit, handled","You, not a brand","Work where you already work","THE PROCESS","Apply as yourself","BD reviews","Get listed","Accept & get paid"]){assert.match(app,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
+ for(const term of ["Keep 80% of every session","Direct deposit, handled","You, not a brand","Work where you already work","THE PROCESS","Say hello","Tell us about yourself — your background, your craft, and where you already work.","Background check","With your permission, we run a background check on everyone who visits members at home. It's how we keep every home comfortable.","A few conversations","A few relaxed conversations with our team — we want to know the person behind the practice.","Welcome in","Once we've said hello, you appear in Explore as yourself.","Your resume or portfolio link","I consent to Salu running a background check as part of the application. This is required for everyone who visits members at home.","Background-checked & personally known","so we know exactly who's at your door.","BG check","Background check consented"]){assert.match(app,new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")))}
  assert.match(css,/\.provider-value-grid\{[^}]*grid-template-columns:1fr 1fr/);
  assert.match(css,/\.provider-process ol\{[^}]*grid-template-columns:repeat\(4/);
 });

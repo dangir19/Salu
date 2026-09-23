@@ -52,7 +52,8 @@ async function seedApprovedProvider(name: string, email: string) {
     mobileAtHome: true,
     neighborhoods: ["Brickell"],
     rateAsk: "$150 / visit",
-    insuranceAttested: true,
+    resumeUrl: "https://example.com/resume/sched-tester.pdf",
+    bgCheckConsent: true,
   });
   await updateApplicationStatus({id: application.id, status: "approved"});
   const serviceId = liveServiceId(application.id, "deep-tissue");

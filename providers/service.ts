@@ -1,4 +1,4 @@
-import type {ProviderApplication, ProviderApplicationStatus, ProviderDocStatus, ProviderLicenseType} from "../domain/types";
+import type {ProviderApplication, ProviderApplicationStatus, ProviderBgCheckStatus, ProviderDocStatus, ProviderLicenseType} from "../domain/types";
 import type {ProviderProfile, Service} from "../domain/mock-data";
 import {
   catalogFromApplication,
@@ -26,6 +26,8 @@ export const APPLICATION_STATUSES: ProviderApplicationStatus[] = [
 ];
 
 export const DOC_STATUSES: ProviderDocStatus[] = ["missing", "received"];
+
+export const BG_CHECK_STATUSES: ProviderBgCheckStatus[] = ["pending", "clear", "needs_review"];
 
 export type ApplicationListFilter = {
   status?: ProviderApplicationStatus;
@@ -62,6 +64,10 @@ function isDocStatus(value: string): value is ProviderDocStatus {
   return DOC_STATUSES.includes(value as ProviderDocStatus);
 }
 
+function isBgCheckStatus(value: string): value is ProviderBgCheckStatus {
+  return BG_CHECK_STATUSES.includes(value as ProviderBgCheckStatus);
+}
+
 function matchesFilter(row: ProviderApplication, filter: ApplicationListFilter): boolean {
   if (filter.status && row.status !== filter.status) return false;
   if (filter.neighborhood && !row.neighborhoods.includes(filter.neighborhood)) return false;
@@ -85,6 +91,7 @@ async function persistApplication(application: ProviderApplication): Promise<voi
         reviewNote: application.reviewNote,
         docsLicenseProof: application.docsLicenseProof,
         docsInsurance: application.docsInsurance,
+        bgCheckStatus: application.bgCheckStatus,
         updatedAt: application.updatedAt,
       });
     } else {
@@ -178,6 +185,8 @@ export async function submitApplication(input: {
   neighborhoods?: unknown;
   rateAsk?: string;
   insuranceAttested?: unknown;
+  resumeUrl?: string;
+  bgCheckConsent?: unknown;
   notes?: string;
 }): Promise<ProviderApplication> {
   const fullName = input.fullName?.trim() ?? "";
@@ -189,19 +198,26 @@ export async function submitApplication(input: {
   const rateAsk = input.rateAsk?.trim() ?? "";
   const notes = input.notes?.trim();
   const mobileAtHome = input.mobileAtHome === true || input.mobileAtHome === "yes" || input.mobileAtHome === "true";
+  const resumeUrl = input.resumeUrl?.trim() ?? "";
+  const bgCheckConsent = input.bgCheckConsent === true;
 
   if (!fullName) throw new ProviderError("Please share your full legal name.");
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ProviderError("A working email helps BD follow up.");
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ProviderError("A working email helps us follow up.");
   if (!isLicenseType(licenseType)) throw new ProviderError("Choose your Florida license type.");
   if (!licenseNumber || licenseNumber.length < 4) throw new ProviderError("Add your Florida license number.");
   if (typeof input.mobileAtHome !== "boolean" && input.mobileAtHome !== "yes" && input.mobileAtHome !== "no" && input.mobileAtHome !== "true" && input.mobileAtHome !== "false") {
     throw new ProviderError("Tell us whether you can work mobile / at-home.");
   }
   if (!neighborhoods.length) throw new ProviderError("Choose Brickell, Miami Beach, and/or Miami-Dade.");
-  if (!rateAsk) throw new ProviderError("Share your rate ask so BD can place you in the Miami pipeline.");
+  if (!rateAsk) throw new ProviderError("Share your rate ask so we can place your listing in Miami.");
   const allowedRate = (PROVIDER_RATE_ASKS as readonly string[]).includes(rateAsk);
   if (!allowedRate && rateAsk.length > 80) throw new ProviderError("Keep the rate ask short — a typical visit rate is enough.");
-  if (!input.insuranceAttested) throw new ProviderError("Please attest that you carry professional liability insurance, or will before seeing members.");
+  if (!resumeUrl || resumeUrl.length > 600 || !/^https?:\/\/\S+$/i.test(resumeUrl)) {
+    throw new ProviderError("Share a link to your resume or portfolio (LinkedIn, a PDF link, or your portfolio).");
+  }
+  if (!bgCheckConsent) {
+    throw new ProviderError("Background-check consent is required — it's how we keep every home comfortable.");
+  }
 
   const now = new Date().toISOString();
   const application: ProviderApplication = {
@@ -214,7 +230,10 @@ export async function submitApplication(input: {
     mobileAtHome,
     neighborhoods,
     rateAsk,
-    insuranceAttested: true,
+    insuranceAttested: false,
+    resumeUrl,
+    bgCheckConsent: true,
+    bgCheckStatus: "pending",
     docsLicenseProof: "missing",
     docsInsurance: "missing",
     notes: notes || undefined,
@@ -233,6 +252,7 @@ export async function updateApplicationStatus(input: {
   reviewNote?: string;
   docsLicenseProof?: string;
   docsInsurance?: string;
+  bgCheckStatus?: string;
 }): Promise<ProviderApplication> {
   const id = input.id?.trim() ?? "";
   if (!id) throw new ProviderError("Choose an application to update.");
@@ -260,6 +280,9 @@ export async function updateApplicationStatus(input: {
   if (input.docsInsurance && !isDocStatus(input.docsInsurance)) {
     throw new ProviderError("Insurance docs must be missing or received.");
   }
+  if (input.bgCheckStatus && !isBgCheckStatus(input.bgCheckStatus)) {
+    throw new ProviderError("Background check must be pending, clear, or needs review.");
+  }
 
   const next: ProviderApplication = {
     ...current,
@@ -267,6 +290,7 @@ export async function updateApplicationStatus(input: {
     reviewNote: input.reviewNote !== undefined ? (input.reviewNote.trim() || undefined) : current.reviewNote,
     docsLicenseProof: input.docsLicenseProof && isDocStatus(input.docsLicenseProof) ? input.docsLicenseProof : current.docsLicenseProof,
     docsInsurance: input.docsInsurance && isDocStatus(input.docsInsurance) ? input.docsInsurance : current.docsInsurance,
+    bgCheckStatus: input.bgCheckStatus && isBgCheckStatus(input.bgCheckStatus) ? input.bgCheckStatus : current.bgCheckStatus,
     updatedAt: new Date().toISOString(),
   };
   await persistApplication(next);

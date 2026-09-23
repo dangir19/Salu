@@ -61,7 +61,7 @@ export default function SignIn({
         surface={surface}
         returnTo={safeReturn}
         staffGate={staffGate}
-        title={staffGate ? "Staff sign-in for the review queue." : "Come in. We’ll take it from here."}
+        title={staffGate ? "Staff sign-in." : "Come in. We’ll take it from here."}
         switchHref="/provider/signin"
         switchLabel="Provider sign-in"
       />
@@ -91,8 +91,8 @@ export function ProviderSignIn({
         surface={surface}
         returnTo={safeReturn}
         title="Come in. The request queue is waiting."
-        signInCopy="Use the email on your approved Apply. After approval, this same account opens the workspace with role=provider."
-        createCopy="Create the account you’ll use after approval. Role still comes from Apply, SALU_PROVIDER_EMAILS, or the labeled demo."
+        signInCopy="Use the email on your Salu application. Once we've welcomed you, this same account opens the workspace with role=provider."
+        createCopy="Create the account you’ll use once we’ve said hello. Role still comes from your application, SALU_PROVIDER_EMAILS, or the labeled demo."
         switchHref="/signin"
         switchLabel="Member sign-in"
       />
@@ -173,14 +173,14 @@ function SignInCard({
   const [notice, setNotice] = useState(credentialsErrorFromSearch);
   const [nativeReady, setNativeReady] = useState<boolean | null>(null);
   const defaultSignIn = staffGate
-    ? "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
+    ? "For allowlisted Salu staff only. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
     : kind === "provider"
-      ? "Use the email on your approved Apply. After approval, this same account opens the workspace with role=provider."
+      ? "Use the email on your Salu application. Once we've welcomed you, this same account opens the workspace with role=provider."
       : "Create an account with email, or sign back in. Atlas, your Credits and Miami bookings stay with your membership.";
   const defaultCreate = staffGate
     ? "Create the staff email you’ll use on SALU_ADMIN_EMAILS. Applicant details never appear on this page."
     : kind === "provider"
-      ? "Create the account you’ll use after approval. Role still comes from Apply, SALU_PROVIDER_EMAILS, or the labeled demo."
+      ? "Create the account you’ll use once we’ve said hello. Role still comes from your application, SALU_PROVIDER_EMAILS, or the labeled demo."
       : "A few details and you’re in. Atlas, Credits and Miami bookings will stay with this membership.";
 
   useEffect(() => {
@@ -523,8 +523,8 @@ async function postAuthForm(action: string, fields: Record<string, string>) {
 function modalCopy(intent: AuthIntent | undefined, staffGate: boolean) {
   if (staffGate) {
     return {
-      title: "Staff sign-in for the review queue.",
-      signInCopy: "The live Miami pipeline is only for allowlisted Salu staff. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page.",
+      title: "Staff sign-in.",
+      signInCopy: "For allowlisted Salu staff only. Sign in with the email on SALU_ADMIN_EMAILS. Applicant details never appear on this page.",
       createCopy: "Create the staff email you’ll use on SALU_ADMIN_EMAILS. Applicant details never appear on this page.",
     };
   }
@@ -644,7 +644,7 @@ export function AdminForbidden({
         <span className="eyebrow">SALU STAFF</span>
         <h1>Not authorized.</h1>
         <p className="signin-copy">
-          This review queue is only for authorized Salu staff. Your signed-in account cannot see or change applications.
+          This area is only for authorized Salu staff. Your signed-in account cannot see or change applications.
         </p>
         <button type="button" className="signin-google" onClick={() => go("home")}>
           Back to Salu

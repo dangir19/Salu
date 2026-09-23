@@ -43,7 +43,8 @@ function validPayload(overrides: Record<string, unknown> = {}) {
     mobileAtHome: true,
     neighborhoods: ["Brickell", "Miami Beach"],
     rateAsk: "$150 / visit",
-    insuranceAttested: true,
+    resumeUrl: "https://linkedin.com/in/elena-diaz",
+    bgCheckConsent: true,
     notes: "Spanish and English. Hotel work is fine.",
     ...overrides,
   };
@@ -72,7 +73,7 @@ test("submits an individual LMT into the Miami pipeline without secrets", async 
   assert.equal(listed[0]?.id, application.id);
 });
 
-test("rejects an application missing neighborhoods, license, or insurance attestation", async () => {
+test("rejects an application missing neighborhoods or license", async () => {
   resetProviderMemory();
   await assert.rejects(
     () => submitApplication(validPayload({neighborhoods: []})),
@@ -82,8 +83,48 @@ test("rejects an application missing neighborhoods, license, or insurance attest
     () => submitApplication(validPayload({licenseNumber: ""})),
     (error: unknown) => error instanceof ProviderError,
   );
+});
+
+test("accepts an application without an insurance attestation", async () => {
+  resetProviderMemory();
+  const {insuranceAttested, ...withoutInsurance} = validPayload();
+  void insuranceAttested;
+  const application = await submitApplication(withoutInsurance);
+  assert.equal(application.status, "submitted");
+  assert.equal(application.insuranceAttested, false);
+});
+
+test("requires a resume link and background-check consent on Apply", async () => {
+  resetProviderMemory();
   await assert.rejects(
-    () => submitApplication(validPayload({insuranceAttested: false})),
+    () => submitApplication(validPayload({resumeUrl: ""})),
+    (error: unknown) => error instanceof ProviderError && /resume/i.test(error.message),
+  );
+  await assert.rejects(
+    () => submitApplication(validPayload({resumeUrl: "not-a-link"})),
+    (error: unknown) => error instanceof ProviderError && /resume/i.test(error.message),
+  );
+  await assert.rejects(
+    () => submitApplication(validPayload({bgCheckConsent: false})),
+    (error: unknown) => error instanceof ProviderError && /background-check/i.test(error.message),
+  );
+});
+
+test("stores resume link, consent, and pending background check on Apply", async () => {
+  resetProviderMemory();
+  const application = await submitApplication(validPayload({resumeUrl: "https://example.com/resume/elena.pdf"}));
+  assert.equal(application.resumeUrl, "https://example.com/resume/elena.pdf");
+  assert.equal(application.bgCheckConsent, true);
+  assert.equal(application.bgCheckStatus, "pending");
+});
+
+test("admin can patch the background-check status", async () => {
+  resetProviderMemory();
+  const application = await submitApplication(validPayload({email: "bg@joinsalu.com"}));
+  const cleared = await updateApplicationStatus({id: application.id, bgCheckStatus: "clear"});
+  assert.equal(cleared.bgCheckStatus, "clear");
+  await assert.rejects(
+    () => updateApplicationStatus({id: application.id, bgCheckStatus: "bogus"}),
     (error: unknown) => error instanceof ProviderError,
   );
 });

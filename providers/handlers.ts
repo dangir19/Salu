@@ -58,7 +58,7 @@ async function handleSubmit(request: Request): Promise<Response> {
     return json({
       source: "server",
       application,
-      message: "Your application is in the Miami review pipeline.",
+      message: "Thank you — your application is with us. We'll read it by hand and reach out soon.",
     });
   } catch (error) {
     return errorResponse(error);
@@ -83,7 +83,7 @@ async function handleCatalog(): Promise<Response> {
     providers: catalog.providers,
     mockFallback: true,
     message: catalog.providers.length
-      ? "Approved independent Miami providers from the BD pipeline."
+      ? "Independent Miami providers we've met — people we know by name."
       : "No approved providers yet. Explore still shows the labeled demo catalog.",
   });
 }
@@ -125,7 +125,7 @@ async function handleStatus(request: Request, runtimeEnv: RuntimeEnv): Promise<R
   if (!auth.ok) {
     return json({source: "server", error: auth.error, opsOpen: false}, auth.status);
   }
-  let body: {id?: string; status?: string; action?: string; reviewNote?: string; docsLicenseProof?: string; docsInsurance?: string};
+  let body: {id?: string; status?: string; action?: string; reviewNote?: string; docsLicenseProof?: string; docsInsurance?: string; bgCheckStatus?: string};
   try {
     body = (await request.json()) as typeof body;
   } catch {

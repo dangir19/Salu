@@ -1,5 +1,5 @@
 import {desc, eq, sql} from "drizzle-orm";
-import type {ProviderAccount, ProviderApplication, ProviderApplicationStatus, ProviderDocStatus, ProviderLicenseType} from "../domain/types";
+import type {ProviderAccount, ProviderApplication, ProviderApplicationStatus, ProviderBgCheckStatus, ProviderDocStatus, ProviderLicenseType} from "../domain/types";
 import {getDb} from "./index";
 import {providerApplications} from "./schema";
 import {liveServiceId, serviceKeysForLicense} from "../providers/catalog";
@@ -25,6 +25,9 @@ function applicationFromRow(row: typeof providerApplications.$inferSelect): Prov
     neighborhoods: parseList(row.neighborhoods),
     rateAsk: row.rateAsk,
     insuranceAttested: Boolean(row.insuranceAttested),
+    resumeUrl: row.resumeUrl ?? undefined,
+    bgCheckConsent: Boolean(row.bgCheckConsent),
+    bgCheckStatus: (row.bgCheckStatus ?? "pending") as ProviderBgCheckStatus,
     docsLicenseProof: row.docsLicenseProof as ProviderDocStatus,
     docsInsurance: row.docsInsurance as ProviderDocStatus,
     notes: row.notes ?? undefined,
@@ -64,6 +67,19 @@ export async function ensureProviderApplicationsSchema(): Promise<boolean> {
       created_at text NOT NULL,
       updated_at text NOT NULL
     )`));
+    // Backfill 0012_provider_vetting.sql columns on pre-migration databases
+    // (CREATE TABLE above already covers new databases).
+    for (const ddl of [
+      `ALTER TABLE provider_applications ADD COLUMN resume_url text`,
+      `ALTER TABLE provider_applications ADD COLUMN bg_check_consent integer NOT NULL DEFAULT 0`,
+      `ALTER TABLE provider_applications ADD COLUMN bg_check_status text NOT NULL DEFAULT 'pending'`,
+    ]) {
+      try {
+        await db.run(sql.raw(ddl));
+      } catch {
+        // Column already exists.
+      }
+    }
     try {
       await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS provider_applications_status_idx ON provider_applications (status)`));
       await db.run(sql.raw(`CREATE INDEX IF NOT EXISTS provider_applications_email_idx ON provider_applications (email)`));
@@ -123,6 +139,9 @@ export async function insertProviderApplication(application: ProviderApplication
       neighborhoods: JSON.stringify(application.neighborhoods),
       rateAsk: application.rateAsk,
       insuranceAttested: application.insuranceAttested ? 1 : 0,
+      resumeUrl: application.resumeUrl ?? null,
+      bgCheckConsent: application.bgCheckConsent ? 1 : 0,
+      bgCheckStatus: application.bgCheckStatus,
       docsLicenseProof: application.docsLicenseProof,
       docsInsurance: application.docsInsurance,
       notes: application.notes ?? null,
@@ -135,7 +154,7 @@ export async function insertProviderApplication(application: ProviderApplication
   }));
 }
 
-export type ProviderApplicationPatch = Partial<Pick<ProviderApplication, "status" | "reviewNote" | "docsLicenseProof" | "docsInsurance" | "updatedAt">>;
+export type ProviderApplicationPatch = Partial<Pick<ProviderApplication, "status" | "reviewNote" | "docsLicenseProof" | "docsInsurance" | "bgCheckStatus" | "updatedAt">>;
 
 export function providerAccountFromApplication(application: ProviderApplication): ProviderAccount | null {
   const email = application.email.trim().toLowerCase();
@@ -183,6 +202,7 @@ export async function updateProviderApplication(id: string, patch: ProviderAppli
       reviewNote: patch.reviewNote === "" ? null : (patch.reviewNote ?? current.reviewNote),
       docsLicenseProof: patch.docsLicenseProof ?? current.docsLicenseProof,
       docsInsurance: patch.docsInsurance ?? current.docsInsurance,
+      bgCheckStatus: patch.bgCheckStatus ?? current.bgCheckStatus ?? "pending",
       updatedAt: patch.updatedAt ?? new Date().toISOString(),
     };
     await db.update(providerApplications).set(next).where(eq(providerApplications.id, id));

@@ -52,7 +52,8 @@ async function seedProvider(): Promise<{accountId: string}> {
     mobileAtHome: true,
     neighborhoods: ["Miami Beach"],
     rateAsk: "$150 / visit",
-    insuranceAttested: true,
+    resumeUrl: "https://example.com/resume/test-provider.pdf",
+    bgCheckConsent: true,
   });
   await updateApplicationStatus({id: application.id, status: "approved"});
   const accountId = `prov_app_${application.id}`;

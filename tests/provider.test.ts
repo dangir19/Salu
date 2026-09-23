@@ -274,7 +274,8 @@ test("approved Apply email can sign in and accept a live catalog booking", async
     mobileAtHome: true,
     neighborhoods: ["Brickell"],
     rateAsk: "$150 / visit",
-    insuranceAttested: true,
+    resumeUrl: "https://linkedin.com/in/camila-ortega",
+    bgCheckConsent: true,
   });
   await updateApplicationStatus({id: application.id, status: "approved"});
 

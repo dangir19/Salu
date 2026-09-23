@@ -27,6 +27,7 @@ export type Provider={
 export type ProviderApplicationStatus="submitted"|"under_review"|"approved"|"rejected";
 export type ProviderLicenseType="LMT"|"RN"|"Acupuncture Physician"|"Esthetician"|"Stretch practitioner"|"Other";
 export type ProviderDocStatus="missing"|"received";
+export type ProviderBgCheckStatus="pending"|"clear"|"needs_review";
 export type ProviderApplication={
   id:ID;
   fullName:string;
@@ -38,6 +39,9 @@ export type ProviderApplication={
   neighborhoods:string[];
   rateAsk:string;
   insuranceAttested:boolean;
+  resumeUrl?:string;
+  bgCheckConsent:boolean;
+  bgCheckStatus:ProviderBgCheckStatus;
   docsLicenseProof:ProviderDocStatus;
   docsInsurance:ProviderDocStatus;
   notes?:string;
